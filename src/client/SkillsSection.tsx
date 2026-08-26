@@ -301,9 +301,16 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
                       {row.problem ? <div className="smc-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable')}</div> : null}
                     </td>
                     <td><StatePill state={row.state} t={t} busy={busyDir === row.dir} onChange={next => changeState(row, next)} /></td>
+                    {/* A shadowed copy is never loaded, so it costs nothing.
+                        Printing its description's price next to the Shadowed
+                        badge said two contradictory things at once. */}
                     <td className="smc-tok">
-                      <b>{row.tokens}</b><span>tok</span>
-                      {row.fullTokens > row.tokens ? <em>{t('saved')} {row.fullTokens - row.tokens}</em> : null}
+                      {row.shadowedBy
+                        ? <><b>0</b><span>tok</span><em className="smc-muted">{t('wouldCost', { n: row.tokens })}</em></>
+                        : <>
+                          <b>{row.tokens}</b><span>tok</span>
+                          {row.fullTokens > row.tokens ? <em>{t('saved')} {row.fullTokens - row.tokens}</em> : null}
+                        </>}
                     </td>
                     <td className="smc-mono">{row.root}</td>
                     <td className="smc-mono">{when(row.updatedAt)}</td>

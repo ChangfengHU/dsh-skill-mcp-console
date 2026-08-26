@@ -59,7 +59,8 @@ export const en = {
   problemNameMismatch: 'frontmatter name does not match the directory name, so the frontmatter name does nothing',
   problemNoDescription: 'frontmatter has no description — the model will never invoke it',
   problemUnreadable: 'SKILL.md could not be read',
-  shadowedNote: 'Shadowed: dsh loads the copy in {root} instead. Only one copy of a name ever wins, and dsh has no way to show you the losers.',
+  shadowedNote: 'Not loaded. dsh runs the copy in {root} under this name instead — editing this one changes nothing. Only one copy of a name ever wins, and dsh has no API that can tell you which one lost, so this panel works it out from disk.',
+  wouldCost: 'would be {n}',
   nonNative: 'Not a dsh skill root — reachable only while a bridging plugin registers it.',
 
   back: 'Back',
@@ -191,7 +192,8 @@ export const zh: Record<ConsoleLocaleKey, string> = {
   problemNameMismatch: 'frontmatter 的 name 与目录名不一致,那个 name 静默失效',
   problemNoDescription: 'frontmatter 缺 description,模型永远不会自动调用它',
   problemUnreadable: 'SKILL.md 读不出来',
-  shadowedNote: '被遮蔽:dsh 实际加载的是 {root} 里那份。同名只有一份能赢,而 dsh 没有任何接口能告诉你输的是谁。',
+  shadowedNote: '这一份没有被加载。这个名字下 dsh 实际跑的是 {root} 里那份——改这一份不会有任何效果。同名只有一份能赢,而 dsh 没有接口能告诉你哪份落选,所以这里替你从磁盘上算了出来。',
+  wouldCost: '本来 {n}',
   nonNative: '不是 dsh 的技能根 —— 只有装了桥接插件时才能调到。',
 
   back: '返回',

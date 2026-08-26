@@ -309,7 +309,7 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
 
   useEffect(() => { load('', 'agent-skills') }, [load])
 
-  if (open) return <RepoDetail entry={open} api={api} t={t} onBack={() => setOpen(null)} onInstall={install => { onInstall(install); onClose() }} />
+  if (open) return <RepoDetail entry={open} api={api} t={t} onBack={() => setOpen(null)} onInstall={onInstall} />
 
   return (
     <Modal title={t('directoryTitle')} lead={t('directoryLead')} onClose={onClose} wide>
@@ -349,7 +349,10 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
               <button
                 className={`smc-act${entry.installed ? ' smc-act-on' : ''}`}
                 aria-label={entry.installed ? t('installed') : t('install')}
-                onClick={() => { onInstall(entry.install); onClose() }}
+                // Only onInstall. Calling onClose() after it clears the very
+                // flow onInstall just switched to, and the install dialog
+                // never opens — the close won the race every time.
+                onClick={() => onInstall(entry.install)}
               >{entry.installed ? '✓' : '＋'}</button>
             </div>
             <div className="smc-cm">

@@ -133,6 +133,7 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-tok b { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13px; }
 .smc-tok span { font-size: 10.5px; opacity: .5; margin-left: 3px; }
 .smc-tok em { display: block; font-style: normal; font-size: 10.5px; color: var(--smc-ok); margin-top: 1px; }
+.smc-tok em.smc-muted { color: var(--smc-faint); }
 
 /* State menu: pick directly instead of cycling. Four states behind one pill
    meant up to three blind clicks to reach the one you wanted. */
