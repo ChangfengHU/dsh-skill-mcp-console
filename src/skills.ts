@@ -21,9 +21,9 @@
  * @module dsh-skill-mcp-console/skills
  */
 
-import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { estimateTokens } from './tokens.ts'
 import type { SkillRow, SkillState } from './wire.ts'
 
@@ -196,8 +196,15 @@ export async function readOverrides(home: string): Promise<OverrideFile> {
   }
 }
 
-/** Write the override file. */
+/**
+ * Write the override file.
+ *
+ * The parent is created first. `~/.dsh` exists on any machine that has run
+ * dsh, which is exactly why this was missing for so long — it only fails on
+ * a fresh one, where the first thing a user touches throws.
+ */
 export async function writeOverrides(home: string, data: OverrideFile): Promise<void> {
+  await mkdir(dirname(overridePath(home)), { recursive: true })
   await writeFile(overridePath(home), JSON.stringify(data, null, 2), 'utf8')
 }
 
@@ -340,9 +347,7 @@ export async function setSkillState(home: string, dir: string, state: SkillState
   if (front.bodyStart === -1) throw new Error('SKILL.md has no frontmatter block to edit')
 
   const backups = backupDir(dir)
-  await writeFile(join(dir, '.smc-backup-probe'), '', 'utf8').catch(() => {})
-  await rm(join(dir, '.smc-backup-probe'), { force: true }).catch(() => {})
-  await (await import('node:fs/promises')).mkdir(backups, { recursive: true })
+  await mkdir(backups, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   await writeFile(join(backups, `SKILL.md.${stamp}`), text, 'utf8')
 
@@ -374,7 +379,7 @@ export async function setSkillState(home: string, dir: string, state: SkillState
 /** Remove one skill directory, moving it to a trash folder rather than deleting. */
 export async function removeSkill(home: string, dir: string): Promise<string> {
   const trash = join(home, '.dsh', 'skill-trash')
-  await (await import('node:fs/promises')).mkdir(trash, { recursive: true })
+  await mkdir(trash, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const target = join(trash, `${dir.split(sep).pop()}.${stamp}`)
   await rename(dir, target)

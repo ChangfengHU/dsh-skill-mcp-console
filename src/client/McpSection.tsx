@@ -45,7 +45,7 @@ function ServerCard({ row, api, t, onChanged }: { row: McpRow; api: McpApi; t: T
         </div>
         <span className="smc-chip">{tok(row.tokens)} tok</span>
         <span className={`smc-chip ${row.tools.length ? 'smc-ok' : 'smc-warn'}`}>{row.tools.length} {t('tools')}</span>
-        {row.fiber ? <span className="smc-chip">{row.fiber}</span> : null}
+        {row.fiber ? <span className={`smc-chip ${row.fiber === 'failed' ? 'smc-warn' : ''}`}>{row.fiber}</span> : null}
         <button
           className="smc-toggle"
           aria-pressed={!row.disabled}

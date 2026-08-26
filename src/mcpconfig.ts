@@ -18,7 +18,7 @@
  * @module dsh-skill-mcp-console/mcpconfig
  */
 
-import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { isMap, isSeq, parseDocument, YAMLMap, YAMLSeq, type Document } from 'yaml'
 
@@ -245,7 +245,8 @@ export async function readToolPolicy(home: string): Promise<ToolPolicy> {
   }
 }
 
-/** Write the per-tool opt-outs. */
+/** Write the per-tool opt-outs, creating `~/.dsh` when it is not there yet. */
 export async function writeToolPolicy(home: string, policy: ToolPolicy): Promise<void> {
+  await mkdir(dirname(policyPath(home)), { recursive: true })
   await writeFile(policyPath(home), JSON.stringify(policy, null, 2), 'utf8')
 }

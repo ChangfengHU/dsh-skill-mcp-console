@@ -27,10 +27,23 @@ import {
 } from './mcpconfig.ts'
 import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.ts'
 import { estimateToolTokens } from './tokens.ts'
-import type { DirectoryEntry, McpRow, McpTool, SkillState } from './wire.ts'
+import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wire.ts'
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
+
+/**
+ * Cordis fiber states, as words.
+ *
+ * The raw value is a number, and a chip reading "2" tells nobody anything.
+ * `active` is also the state every healthy entry is in, so the row reports
+ * the phase only when it is something else — a badge that is always present
+ * carries no information, and one that appears only when something is off
+ * is worth glancing at.
+ */
+const FIBER_PHASE: Record<string, string> = {
+  '0': 'pending', '1': 'loading', '2': 'active', '3': 'failed', '4': 'disposed', '5': 'unloading',
+}
 
 /** Where a skill installed through this panel lands. */
 function defaultRoot(home: string): string {
@@ -63,6 +76,18 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   private stageSeq = 0
 
   /**
+   * The last scan, reused for a moment.
+   *
+   * A scan walks every root and stats every file in every skill. Clicking
+   * through a skill's file tree was doing that once per click just to check
+   * the directory is one we know about — twenty directories re-walked to
+   * answer a question the previous scan already answered. Two seconds is long
+   * enough to cover a burst of clicks and short enough that an edit made in
+   * an editor still shows up on the next look.
+   */
+  private scanCache: { at: number; rows: Promise<SkillRow[]> } | null = null
+
+  /**
    * @param ctx - context carrying the loader and the tool registry.
    */
   constructor(ctx: Context) {
@@ -73,11 +98,23 @@ export class SkillMcpConsoleService extends TypertRemoteService {
 
   private get home(): string { return homedir() }
 
+  /** Scan the roots, reusing a result from the last couple of seconds. */
+  private scan(fresh = false): Promise<SkillRow[]> {
+    const now = Date.now()
+    if (!fresh && this.scanCache && now - this.scanCache.at < 2000) return this.scanCache.rows
+    const rows = scanSkills(this.home, process.cwd())
+    this.scanCache = { at: now, rows }
+    return rows
+  }
+
+  /** Drop the cache after a write, so the next read sees the change. */
+  private invalidate(): void { this.scanCache = null }
+
   // ── skills ────────────────────────────────────────────────────────────
 
   /** Every skill on disk, across every root, with shadowing resolved. */
   async skills(): Promise<string> {
-    return JSON.stringify(await scanSkills(this.home, process.cwd()))
+    return JSON.stringify(await this.scan(true))
   }
 
   /** One file's text from inside one skill directory. */
@@ -85,7 +122,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     const { dir, path } = JSON.parse(payload) as { dir: string; path: string }
     // Re-scan rather than trust the caller: the browser could name any
     // directory, and only a real skill directory may be read.
-    const known = await scanSkills(this.home, process.cwd())
+    const known = await this.scan()
     if (!known.some(skill => skill.dir === dir)) throw new Error('not a known skill directory')
     return JSON.stringify({ text: await readSkillFile(dir, path) })
   }
@@ -93,18 +130,21 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   /** Move one skill between the four states. */
   async setSkillState(payload: string): Promise<string> {
     const { dir, state } = JSON.parse(payload) as { dir: string; state: SkillState }
-    const known = await scanSkills(this.home, process.cwd())
+    const known = await this.scan()
     if (!known.some(skill => skill.dir === dir)) throw new Error('not a known skill directory')
     await setSkillState(this.home, dir, state)
+    this.invalidate()
     return JSON.stringify({ ok: true })
   }
 
   /** Move one skill to the trash folder. */
   async removeSkill(payload: string): Promise<string> {
     const { dir } = JSON.parse(payload) as { dir: string }
-    const known = await scanSkills(this.home, process.cwd())
+    const known = await this.scan()
     if (!known.some(skill => skill.dir === dir)) throw new Error('not a known skill directory')
-    return JSON.stringify({ trash: await removeSkill(this.home, dir) })
+    const trash = await removeSkill(this.home, dir)
+    this.invalidate()
+    return JSON.stringify({ trash })
   }
 
   // ── mcp ───────────────────────────────────────────────────────────────
@@ -143,7 +183,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
         transport: typeof config.transport === 'string' ? config.transport : (config.url ? 'streamable-http' : 'stdio'),
         target: targetOf(config),
         disabled: Boolean(entry.disabled),
-        fiber: entry.fiber === undefined ? null : String(entry.fiber.state),
+        fiber: phaseOf(entry.fiber),
         tools: byServer.get(name) ?? [],
       })
       byServer.delete(name)
@@ -248,11 +288,11 @@ export class SkillMcpConsoleService extends TypertRemoteService {
 
     try {
       if (entry.plan.kind === 'shell') {
-        const before = new Set((await scanSkills(this.home)).map(skill => skill.dir))
+        const before = new Set((await this.scan(true)).map(skill => skill.dir))
         const result = await runShell(entry.plan.plan, entry.dir)
         log += result.out
         code = result.code
-        installed = (await scanSkills(this.home)).filter(skill => !before.has(skill.dir)).map(skill => skill.dir)
+        installed = (await this.scan(true)).filter(skill => !before.has(skill.dir)).map(skill => skill.dir)
         if (installed.length === 0) {
           log += `\n(exit ${code}, 但没有新技能落地 / no new skill appeared under any root)`
         }
@@ -264,7 +304,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
         installed = picked.map(candidate => join(target, candidate.name))
       }
 
-      const names = (await scanSkills(this.home)).map(skill => skill.id)
+      const names = (await this.scan(true)).map(skill => skill.id)
       const checks = await Promise.all(installed.map(async dir => ({ dir, checks: await verify(dir, names) })))
       return JSON.stringify({ code, log, installed, checks })
     } finally {
@@ -277,7 +317,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   async createSkill(payload: string): Promise<string> {
     const { name, description, instructions } = JSON.parse(payload) as { name: string; description: string; instructions: string }
     const dir = await createSkill(defaultRoot(this.home), name, description, instructions)
-    const names = (await scanSkills(this.home)).map(skill => skill.id)
+    const names = (await this.scan(true)).map(skill => skill.id)
     return JSON.stringify({ dir, checks: await verify(dir, names) })
   }
 
@@ -285,7 +325,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   async uploadSkill(payload: string): Promise<string> {
     const { filename, base64 } = JSON.parse(payload) as { filename: string; base64: string }
     const dir = await uploadSkill(defaultRoot(this.home), filename, base64)
-    const names = (await scanSkills(this.home)).map(skill => skill.id)
+    const names = (await this.scan(true)).map(skill => skill.id)
     return JSON.stringify({ dir, checks: await verify(dir, names) })
   }
 
@@ -299,7 +339,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
    * with your machine's credentials. Curated entries pin a revision.
    */
   async directory(): Promise<string> {
-    const installed = new Set((await scanSkills(this.home)).map(skill => skill.id))
+    const installed = new Set((await this.scan()).map(skill => skill.id))
     let entries: DirectoryEntry[] = []
     let error: string | null = null
     if (!DEFAULT_REGISTRY) return JSON.stringify({ registry: '', entries, error: null })
@@ -322,6 +362,13 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     }
     return JSON.stringify({ registry: DEFAULT_REGISTRY, entries, error })
   }
+}
+
+/** The fiber's phase as a word, or null while it is simply healthy. */
+function phaseOf(fiber: { state: unknown } | undefined): string | null {
+  if (fiber === undefined) return null
+  const phase = FIBER_PHASE[String(fiber.state)] ?? String(fiber.state)
+  return phase === 'active' ? null : phase
 }
 
 /** Where the server lives, as one display string, with credentials removed. */
