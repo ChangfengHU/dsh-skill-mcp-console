@@ -46,11 +46,9 @@ export const en = {
   saved: 'saves',
 
   stateOn: 'on',
-  stateNameOnly: 'name only',
   stateUserOnly: 'manual only',
   stateOff: 'off',
   legendOn: 'name and description in context; the model can invoke it',
-  legendNameOnly: 'name kept, the long description parked — stops paying for the prose',
   legendUserOnly: 'hidden from the model; you can still invoke it with /',
   legendOff: 'not loaded at all',
 
@@ -108,6 +106,10 @@ export const en = {
   vExecutable: 'scripts are executable',
   vRegistry: 'appears in the skill registry',
   supported: 'Supported forms',
+  noCandidates: 'Downloaded and unpacked, but no SKILL.md turned up inside — this may not be a skill repository, or its skills sit deeper than four directories down. Open it on GitHub and check.',
+  selectAll: 'All',
+  selectNone: 'None',
+  selected: '{n} selected',
 
   uploadTitle: 'Upload a skill',
   uploadLead: 'A .md file needs name and description in its YAML frontmatter; a .zip or .tgz needs a SKILL.md inside.',
@@ -179,11 +181,9 @@ export const zh: Record<ConsoleLocaleKey, string> = {
   saved: '省',
 
   stateOn: '生效',
-  stateNameOnly: '仅名字',
   stateUserOnly: '仅手动',
   stateOff: '关',
   legendOn: '名字和描述都进上下文,模型可自己调用',
-  legendNameOnly: '留下名字,长描述收起来——不再为那段话付费',
   legendUserOnly: '模型看不见,你仍可以用 / 调它',
   legendOff: '完全不加载',
 
@@ -241,6 +241,10 @@ export const zh: Record<ConsoleLocaleKey, string> = {
   vExecutable: 'scripts 可执行',
   vRegistry: '出现在技能注册表里',
   supported: '支持的形式',
+  noCandidates: '下载并解包成功了,但里面没找到任何 SKILL.md —— 可能这不是技能仓库,或者它的技能藏在四层目录以下。去 GitHub 上打开看看。',
+  selectAll: '全选',
+  selectNone: '全不选',
+  selected: '已选 {n} 个',
 
   uploadTitle: '上传技能包',
   uploadLead: '.md 文件的 YAML frontmatter 必须有 name 和 description;.zip / .tgz 包里必须有 SKILL.md。',

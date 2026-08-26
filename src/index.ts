@@ -37,8 +37,8 @@ export const inject = ['tools', 'loader']
 
 export { SkillMcpConsoleService } from './service.ts'
 export {
-  ROOTS, parseFrontmatter, readOverrides, readSkillFile, removeSkill, rootsFor,
-  scanSkills, setSkillState, stateOf, tildify, writeOverrides,
+  ROOTS, parseFrontmatter, readSkillFile, removeSkill, rootsFor,
+  scanSkills, setSkillState, stateOf, tildify,
 } from './skills.ts'
 export {
   MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, phaseOf, policyPath, readToolPolicy,
@@ -54,7 +54,7 @@ export type {
   DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, SkillRow,
   SkillState, VerifyCheck,
 } from './wire.ts'
-export type { Frontmatter, OverrideFile } from './skills.ts'
+export type { Frontmatter } from './skills.ts'
 export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
 
 /**

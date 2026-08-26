@@ -130,11 +130,11 @@ export function parseFrontmatter(text: string): Frontmatter {
   return out
 }
 
-/** Derive the panel's four-state label from the two policy booleans. */
-export function stateOf(front: Frontmatter, shortened: boolean): SkillState {
+/** Derive the panel's state from dsh's two policy booleans. */
+export function stateOf(front: Frontmatter): SkillState {
   if (front.disableModel && !front.userInvocable) return 'off'
   if (front.disableModel) return 'user-only'
-  return shortened ? 'name-only' : 'on'
+  return 'on'
 }
 
 /** Relative paths inside a skill directory, `SKILL.md` first, capped. */
@@ -175,39 +175,6 @@ async function newestMtime(dir: string, files: string[]): Promise<number> {
   return newest
 }
 
-/** Original descriptions parked by the `name-only` state, keyed by directory. */
-export interface OverrideFile {
-  /** `{ [skillDir]: originalDescription }` */
-  shortened: Record<string, string>
-}
-
-/** Where the parked descriptions live. */
-export function overridePath(home: string): string {
-  return join(home, '.dsh', 'skill-mcp-console.json')
-}
-
-/** Read the override file, tolerating absence and corruption. */
-export async function readOverrides(home: string): Promise<OverrideFile> {
-  try {
-    const parsed = JSON.parse(await readFile(overridePath(home), 'utf8')) as Partial<OverrideFile>
-    return { shortened: parsed.shortened ?? {} }
-  } catch {
-    return { shortened: {} }
-  }
-}
-
-/**
- * Write the override file.
- *
- * The parent is created first. `~/.dsh` exists on any machine that has run
- * dsh, which is exactly why this was missing for so long — it only fails on
- * a fresh one, where the first thing a user touches throws.
- */
-export async function writeOverrides(home: string, data: OverrideFile): Promise<void> {
-  await mkdir(dirname(overridePath(home)), { recursive: true })
-  await writeFile(overridePath(home), JSON.stringify(data, null, 2), 'utf8')
-}
-
 /**
  * Scan every root, resolve shadowing, and price each description.
  *
@@ -218,7 +185,6 @@ export async function writeOverrides(home: string, data: OverrideFile): Promise<
  * absent, with no explanation anywhere.
  */
 export async function scanSkills(home = homedir(), workspace?: string): Promise<SkillRow[]> {
-  const overrides = await readOverrides(home)
   const rows: SkillRow[] = []
   const winner = new Map<string, string>()
 
@@ -253,8 +219,7 @@ export async function scanSkills(home = homedir(), workspace?: string): Promise<
         }
       }
 
-      const shortened = overrides.shortened[dir] !== undefined
-      const state = stateOf(front, shortened)
+      const state = stateOf(front)
       const active = state !== 'off' && problem !== 'noSkillMd' && problem !== 'unreadable'
       const shadowedBy = active ? winner.get(entry.name) ?? null : null
       if (active && !winner.has(entry.name)) winner.set(entry.name, tildify(root.path, home))
@@ -263,14 +228,14 @@ export async function scanSkills(home = homedir(), workspace?: string): Promise<
         id: entry.name,
         name: front.name || entry.name,
         description: front.description,
-        originalDescription: overrides.shortened[dir] ?? null,
         dir,
         root: tildify(root.path, home),
         origin: root.origin,
         native: root.native,
         state,
-        tokens: estimateTokens(front.description),
-        fullTokens: estimateTokens(overrides.shortened[dir] ?? front.description),
+        // A skill the model cannot see costs nothing, whatever its
+        // description says.
+        tokens: state === 'on' ? estimateTokens(front.description) : 0,
         updatedAt: await newestMtime(dir, files),
         files,
         problem,
@@ -329,18 +294,15 @@ function backupDir(dir: string): string {
 }
 
 /**
- * Move a skill to one of the four states by editing its `SKILL.md`
+ * Move a skill between states by editing its `SKILL.md`
  * frontmatter, which is the seam dsh's own filesystem provider reads.
  *
- * `name-only` has no policy key in dsh: the registry has exactly two
- * booleans. It is implemented by parking the full description in this
- * plugin's override file and writing the skill's own name in its place, so
- * the model still knows the skill exists but stops paying for the prose.
- * Reverting restores the original text verbatim.
- *
- * Every write copies the file into `<skill>/.smc-backup/` first.
+ * The three states are exactly the three meaningful combinations of dsh's
+ * own two booleans, so nothing here invents behaviour the harness does not
+ * already have. Every write copies the file into `<skill>/.smc-backup/`
+ * first.
  */
-export async function setSkillState(home: string, dir: string, state: SkillState): Promise<void> {
+export async function setSkillState(_home: string, dir: string, state: SkillState): Promise<void> {
   const file = join(dir, 'SKILL.md')
   const text = await readFile(file, 'utf8')
   const front = parseFrontmatter(text)
@@ -351,29 +313,12 @@ export async function setSkillState(home: string, dir: string, state: SkillState
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   await writeFile(join(backups, `SKILL.md.${stamp}`), text, 'utf8')
 
-  const overrides = await readOverrides(home)
   let raw = front.raw
-
-  if (state === 'name-only') {
-    if (overrides.shortened[dir] === undefined) overrides.shortened[dir] = front.description
-    raw = setDescription(raw, overrides.shortened[dir] || front.name)
-    raw = setKey(raw, 'disable-model-invocation', undefined)
-    raw = setKey(raw, 'user-invocable', undefined)
-    // The short form is the skill's own name: enough for the model to know
-    // it exists and ask for it, without the paragraph it used to carry.
-    raw = setDescription(raw, front.name || 'skill')
-  } else {
-    if (overrides.shortened[dir] !== undefined) {
-      raw = setDescription(raw, overrides.shortened[dir])
-      delete overrides.shortened[dir]
-    }
-    raw = setKey(raw, 'disable-model-invocation', state === 'user-only' || state === 'off' ? 'true' : undefined)
-    raw = setKey(raw, 'user-invocable', state === 'off' ? 'false' : undefined)
-  }
+  raw = setKey(raw, 'disable-model-invocation', state === 'user-only' || state === 'off' ? 'true' : undefined)
+  raw = setKey(raw, 'user-invocable', state === 'off' ? 'false' : undefined)
 
   const body = text.slice(front.bodyStart)
   await writeFile(file, `---\n${raw.replace(/\n+$/, '\n')}---${body}`, 'utf8')
-  await writeOverrides(home, overrides)
 }
 
 /** Remove one skill directory, moving it to a trash folder rather than deleting. */

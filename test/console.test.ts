@@ -52,11 +52,10 @@ describe('parseFrontmatter', () => {
 
 describe('stateOf', () => {
   const base = { name: 'x', description: 'y', raw: '', bodyStart: 0 }
-  it('maps the two booleans onto the four states', () => {
-    assert.equal(stateOf({ ...base, disableModel: false, userInvocable: true }, false), 'on')
-    assert.equal(stateOf({ ...base, disableModel: false, userInvocable: true }, true), 'name-only')
-    assert.equal(stateOf({ ...base, disableModel: true, userInvocable: true }, false), 'user-only')
-    assert.equal(stateOf({ ...base, disableModel: true, userInvocable: false }, false), 'off')
+  it('maps dsh’s two booleans onto the three states', () => {
+    assert.equal(stateOf({ ...base, disableModel: false, userInvocable: true }), 'on')
+    assert.equal(stateOf({ ...base, disableModel: true, userInvocable: true }), 'user-only')
+    assert.equal(stateOf({ ...base, disableModel: true, userInvocable: false }), 'off')
   })
 })
 
@@ -181,9 +180,9 @@ describe('setSkillState', () => {
   })
   after(async () => { await rm(home, { recursive: true, force: true }) })
 
-  it('round-trips through all four states and comes back byte-identical', async () => {
+  it('round-trips through every state and comes back byte-identical', async () => {
     const original = await readFile(join(dir, 'SKILL.md'), 'utf8')
-    for (const state of ['name-only', 'user-only', 'off', 'on'] as const) {
+    for (const state of ['user-only', 'off', 'on'] as const) {
       await setSkillState(home, dir, state)
       const rows = await scanSkills(home)
       assert.equal(rows.find(row => row.id === 'toggler')?.state, state, state)
@@ -315,6 +314,19 @@ describe('verify', () => {
 })
 
 describe('findSkills', () => {
+  it('finds skills nested a plugin deep', async () => {
+    // <plugin>/skills/<name>/SKILL.md is a common repository shape. A
+    // two-level walk came back empty from one with sixty-eight skills in it,
+    // and the dialog said nothing at all.
+    const root = await mkdtemp(join(tmpdir(), 'smc-deep-'))
+    await mkdir(join(root, 'pm-execution/skills/create-prd'), { recursive: true })
+    await writeFile(join(root, 'pm-execution/skills/create-prd/SKILL.md'), '---\nname: create-prd\ndescription: d\n---\n', 'utf8')
+    const found = await findSkills(root)
+    assert.deepEqual(found.map(candidate => candidate.name), ['create-prd'])
+    assert.equal(found[0].path, 'pm-execution/skills/create-prd')
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('finds every skill in a repository, not just the first', async () => {
     const root = await mkdtemp(join(tmpdir(), 'smc-find-'))
     for (const name of ['alpha', 'beta']) {

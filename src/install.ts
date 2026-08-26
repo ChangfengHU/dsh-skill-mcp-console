@@ -124,10 +124,19 @@ function parseRepo(text: string): RepoRef | null {
   return ref
 }
 
-/** Directories under `root` that hold a `SKILL.md`, at most two levels deep. */
-export async function findSkills(root: string, depth = 2): Promise<InstallCandidate[]> {
+/**
+ * Directories under `root` that hold a `SKILL.md`.
+ *
+ * Four levels, not two. Plenty of repositories nest their skills a plugin
+ * deep — `<plugin>/skills/<name>/SKILL.md` is a common shape, and one such
+ * repository with sixty-eight skills in it came back empty from a
+ * two-level walk. The recursion stops at the first `SKILL.md` on a branch,
+ * so the extra depth costs nothing on a flat repository.
+ */
+export async function findSkills(root: string, depth = 4, limit = 300): Promise<InstallCandidate[]> {
   const found: InstallCandidate[] = []
   const walk = async (dir: string, rel: string, left: number): Promise<void> => {
+    if (found.length >= limit) return
     let entries
     try {
       entries = await readdir(dir, { withFileTypes: true })

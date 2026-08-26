@@ -102,11 +102,6 @@ function Detail({ skill, api, t, onBack, onChanged }: {
       {skill.problem ? <div className="smc-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable')}</div> : null}
       {!skill.native ? <div className="smc-hint">{t('nonNative')}</div> : null}
       {skill.description ? <p className="smc-lede">{skill.description}</p> : null}
-      {skill.originalDescription ? (
-        <p className="smc-hint">
-          {t('stateNameOnly')} — {t('legendNameOnly')} · {tok(skill.fullTokens - skill.tokens)} tok {t('saved')}
-        </p>
-      ) : null}
 
       <div className={`smc-detail${skill.files.length <= 1 ? ' smc-solo' : ''}`}>
         <div className="smc-tree">
@@ -199,9 +194,9 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
 
   const problems = rows?.filter(row => row.problem).length ?? 0
   const shadowed = rows?.filter(row => row.shadowedBy).length ?? 0
-  const resident = rows?.filter(row => !row.shadowedBy && row.state !== 'off' && row.state !== 'user-only')
-    .reduce((sum, row) => sum + row.tokens, 0) ?? 0
-  const savings = rows?.reduce((sum, row) => sum + Math.max(0, row.fullTokens - row.tokens), 0) ?? 0
+  // A shadowed copy is never loaded, and neither is anything but `on`, so
+  // only the winning `on` rows are actually being paid for.
+  const resident = rows?.filter(row => !row.shadowedBy).reduce((sum, row) => sum + row.tokens, 0) ?? 0
 
   const changeState = (row: SkillRow, next: SkillState) => {
     setBusyDir(row.dir)
@@ -269,7 +264,6 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
         <span className="smc-budget">
           <span className="smc-bl">{t('resident')} {t('approx')}</span>
           <b>{tok(resident)}</b> tok
-          {savings > 0 ? <span className="smc-bd">↓{tok(savings)}</span> : null}
         </span>
       </div>
 
@@ -305,12 +299,7 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
                         Printing its description's price next to the Shadowed
                         badge said two contradictory things at once. */}
                     <td className="smc-tok">
-                      {row.shadowedBy
-                        ? <><b>0</b><span>tok</span><em className="smc-muted">{t('wouldCost', { n: row.tokens })}</em></>
-                        : <>
-                          <b>{row.tokens}</b><span>tok</span>
-                          {row.fullTokens > row.tokens ? <em>{t('saved')} {row.fullTokens - row.tokens}</em> : null}
-                        </>}
+                      <b>{row.shadowedBy ? 0 : row.tokens}</b><span>tok</span>
                     </td>
                     <td className="smc-mono">{row.root}</td>
                     <td className="smc-mono">{when(row.updatedAt)}</td>
@@ -331,7 +320,6 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
 
       <div className="smc-legend">
         <span><i className="smc-s-on">{t('stateOn')}</i> {t('legendOn')}</span>
-        <span><i className="smc-s-name">{t('stateNameOnly')}</i> {t('legendNameOnly')}</span>
         <span><i className="smc-s-user">{t('stateUserOnly')}</i> {t('legendUserOnly')}</span>
         <span><i className="smc-s-off">{t('stateOff')}</i> {t('legendOff')}</span>
       </div>

@@ -62,9 +62,14 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
       const staged = await api.stageInstall(plan)
       setToken(staged.token)
       setCandidates(staged.candidates)
-      setChosen(staged.candidates.map(candidate => candidate.path))
+      // Pre-ticking sixty-eight boxes invites an accidental install of all of
+      // them. A handful is a convenience; a pile is a decision.
+      setChosen(staged.candidates.length <= 5 ? staged.candidates.map(candidate => candidate.path) : [])
       setStageLog(staged.log)
-      if (plan.kind === 'shell') await doRun(staged.token, [])
+      if (plan.kind === 'shell') { await doRun(staged.token, []); return }
+      // Silence was the worst outcome here: the download succeeded, the log
+      // said "extract", and then nothing at all appeared.
+      if (staged.candidates.length === 0) setError(t('noCandidates'))
     } catch (cause) {
       setError((cause as Error).message)
     } finally { setBusy(false) }
@@ -122,7 +127,12 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
 
       {candidates.length > 0 ? (
         <div className="smc-verify">
-          <b>{t('found', { n: candidates.length })}</b>
+          <b>
+            {t('found', { n: candidates.length })}
+            <button className="smc-btn smc-tiny" onClick={() => setChosen(candidates.map(c => c.path))}>{t('selectAll')}</button>
+            <button className="smc-btn smc-tiny" onClick={() => setChosen([])}>{t('selectNone')}</button>
+            <span className="smc-vsub"> · {t('selected', { n: chosen.length })}</span>
+          </b>
           {candidates.map(candidate => (
             <label className="smc-pick" key={candidate.path}>
               <input
@@ -150,15 +160,17 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
 
       {error ? <div className="smc-err">{error}</div> : null}
 
-      <div className="smc-req">
-        <b>{t('supported')}</b>
+      {/* Folded away. It is reference material you read once, and it was
+          taking a third of the dialog on every visit. */}
+      <details className="smc-req">
+        <summary>{t('supported')}</summary>
         <ul>
           <li><code>https://github.com/user/repo</code> · <code>user/repo</code> · <code>github:user/repo/skills/foo</code> · <code>…/tree/&lt;branch&gt;/&lt;dir&gt;</code></li>
           <li><code>git clone &lt;repo&gt;</code></li>
           <li>a URL pointing straight at a <code>SKILL.md</code>, <code>.zip</code> or <code>.tgz</code></li>
           <li><code>bash &lt;(curl -fsSL &lt;url&gt;)</code> · <code>curl … | bash</code></li>
         </ul>
-      </div>
+      </details>
 
       <div className="smc-foot">
         <button className="smc-btn" onClick={onClose}>{t('cancel')}</button>

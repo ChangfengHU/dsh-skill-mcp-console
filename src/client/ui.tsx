@@ -31,26 +31,26 @@ export function tok(count: number): string {
   return count < 1000 ? String(count) : `${(count / 1000).toFixed(1)}k`
 }
 
-/** The four states, in the order the pill cycles through them. */
-export const STATES: SkillState[] = ['on', 'name-only', 'user-only', 'off']
+/** The three states, in the order the menu lists them. */
+export const STATES: SkillState[] = ['on', 'user-only', 'off']
 
 /** Dictionary key for one state's short label. */
 export function stateLabel(state: SkillState): ConsoleLocaleKey {
-  return state === 'on' ? 'stateOn' : state === 'name-only' ? 'stateNameOnly' : state === 'user-only' ? 'stateUserOnly' : 'stateOff'
+  return state === 'on' ? 'stateOn' : state === 'user-only' ? 'stateUserOnly' : 'stateOff'
 }
 
 /** CSS modifier for one state. */
 export function stateClass(state: SkillState): string {
-  return state === 'on' ? 'smc-s-on' : state === 'name-only' ? 'smc-s-name' : state === 'user-only' ? 'smc-s-user' : 'smc-s-off'
+  return state === 'on' ? 'smc-s-on' : state === 'user-only' ? 'smc-s-user' : 'smc-s-off'
 }
 
 /** Dictionary key for one state's one-line explanation. */
 function stateLegend(state: SkillState): ConsoleLocaleKey {
-  return state === 'on' ? 'legendOn' : state === 'name-only' ? 'legendNameOnly' : state === 'user-only' ? 'legendUserOnly' : 'legendOff'
+  return state === 'on' ? 'legendOn' : state === 'user-only' ? 'legendUserOnly' : 'legendOff'
 }
 
 /**
- * The state control: a pill that opens a menu of the four states, each with
+ * The state control: a pill that opens a menu of the three states, each with
  * the sentence that says what it does.
  *
  * It used to cycle on click, which meant up to three blind presses to reach
@@ -81,7 +81,7 @@ export function StatePill({ state, t, onChange, busy }: { state: SkillState; t: 
           event.stopPropagation()
           if (at) { setAt(null); return }
           const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-          setAt({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 268) })
+                setAt({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 268) })
         }}
       >{busy ? '…' : t(stateLabel(state))}</button>
       {at ? (

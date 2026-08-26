@@ -54,8 +54,16 @@ export const METHODS = [
 /** The canonical invocation list. Both faces register exactly this. */
 export const CONSOLE_INVOCATIONS = Object.freeze(METHODS.map(([method, argc]) => descriptor(method, argc)))
 
-/** The four states a skill can be parked in. */
-export type SkillState = 'on' | 'name-only' | 'user-only' | 'off'
+/**
+ * The three states a skill can be parked in.
+ *
+ * These are exactly dsh's own two policy booleans, in their three meaningful
+ * combinations. A fourth state that parked the description elsewhere to save
+ * tokens lived here briefly; it was dropped because a model that knows a
+ * skill's name but not when to use it will not reach for it anyway, which
+ * made it a more expensive `user-only`.
+ */
+export type SkillState = 'on' | 'user-only' | 'off'
 
 /** One skill as the panel sees it. */
 export interface SkillRow {
@@ -63,10 +71,8 @@ export interface SkillRow {
   id: string
   /** `name:` from the frontmatter, falling back to the directory name. */
   name: string
-  /** Current `description:`, which is what sits in context every turn. */
+  /** The `description:`, which is what sits in context every turn. */
   description: string
-  /** Full text parked by `name-only`, or null when nothing is parked. */
-  originalDescription: string | null
   /** Absolute path of the skill directory. */
   dir: string
   /** The root this skill was found under, `~`-shortened. */
@@ -77,10 +83,8 @@ export interface SkillRow {
   native: boolean
   /** Where this skill currently sits among the four states. */
   state: SkillState
-  /** Estimated context cost of the current description. */
+  /** Estimated context cost of the description, when the model can see it. */
   tokens: number
-  /** Estimated cost of the full description, for showing what `name-only` saves. */
-  fullTokens: number
   /** Epoch ms of the newest file in the skill directory. */
   updatedAt: number
   /** Relative paths inside the skill directory, `SKILL.md` first. */

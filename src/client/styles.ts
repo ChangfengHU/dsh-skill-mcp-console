@@ -275,7 +275,7 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 
 .smc-verify { border: 1px solid var(--smc-line); border-radius: 8px; padding: 11px 13px;
   display: flex; flex-direction: column; gap: 3px; }
-.smc-verify > b { font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
+.smc-verify > b { font-size: 12.5px; font-weight: 600; margin-bottom: 5px; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .smc-vsub { font-weight: 400; opacity: .55; font-size: 11.5px; }
 .smc-v { display: flex; gap: 9px; align-items: baseline; font-size: 12.5px; line-height: 1.55; opacity: .82; }
 .smc-vi { font-family: ui-monospace, monospace; font-weight: 700; flex: none; }
@@ -288,7 +288,10 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-pd { opacity: .55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 .smc-req { font-size: 11.5px; opacity: .62; }
-.smc-req b { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 5px; opacity: .8; }
+.smc-req > summary { cursor: pointer; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; padding: 2px 0; }
+.smc-req > summary:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 2px; border-radius: 3px; }
+.smc-req[open] > summary { margin-bottom: 6px; }
+.smc-btn.smc-tiny { font-size: 11px; padding: 1px 7px; margin-left: 7px; font-weight: 400; }
 .smc-req ul { margin: 0; padding-left: 17px; } .smc-req li { margin-bottom: 3px; line-height: 1.6; }
 .smc-req code, .smc-hint code { font-family: ui-monospace, monospace; font-size: 11px;
   border: 1px solid var(--smc-line); padding: .5px 4px; border-radius: 3px; }
