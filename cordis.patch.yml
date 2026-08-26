@@ -1,0 +1,8 @@
+# dsh-skill-mcp-console bundle patch: mount the console's host service.
+#
+# `insert` is required — a bare `- id:` entry is a patch against an EXISTING
+# entry, and one that matches nothing is skipped in silence while the profile
+# still loads. New plugins have to be inserted.
+- insert:
+    - id: skill-mcp-console
+      name: dsh-skill-mcp-console

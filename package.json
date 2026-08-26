@@ -1,0 +1,67 @@
+{
+  "name": "dsh-skill-mcp-console",
+  "version": "0.1.2",
+  "description": "Skills and MCP servers in two top-level Settings sections for DeepSeek Harness: every skill root scanned (not just one namespace), SKILL.md rendered or raw, MCP servers with their live tool inventory, and the config shown as the universal mcpServers JSON everyone else writes. · 技能与 MCP 控制台:两个顶层菜单,扫全部技能根目录,MCP 配置用通用 mcpServers 格式呈现。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "mcp",
+    "skills",
+    "agent-skills",
+    "settings",
+    "console"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./typert": {
+      "default": "./lib/typert.host.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "esbuild": "^0.25.12"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc.8 <0.2.0",
+    "react": "^18.2.0"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
