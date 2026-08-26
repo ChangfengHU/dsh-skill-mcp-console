@@ -130,8 +130,9 @@ export const en = {
   install: 'Install',
   installed: 'Installed',
   registryEmpty: 'The registry returned no entries.',
+  registryUnset: 'No skill index is configured for this deployment.',
   registryError: 'Could not read the registry: {error}',
-  registryHint: 'Point SMC_REGISTRY_URL at your own index to fill this.',
+  registryHint: 'Set SMC_REGISTRY_URL to a JSON index you curate — { "skills": [{ name, description, install, version }] } — and it fills this page. Pin a revision in each entry: the Agent Skills format has no version field of its own.',
 }
 
 /** Chinese copy. */
@@ -255,6 +256,7 @@ export const zh: Record<ConsoleLocaleKey, string> = {
   install: '安装',
   installed: '已安装',
   registryEmpty: '目录里没有条目。',
+  registryUnset: '这个部署还没有配置技能索引。',
   registryError: '读不到目录:{error}',
-  registryHint: '把 SMC_REGISTRY_URL 指向你自己的索引即可填满这里。',
+  registryHint: '把 SMC_REGISTRY_URL 指向你自己维护的 JSON 索引即可填满这页 —— 格式是 { "skills": [{ name, description, install, version }] }。每条都钉上版本:Agent Skills 格式本身没有版本号。',
 }

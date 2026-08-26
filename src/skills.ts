@@ -60,8 +60,19 @@ export function tildify(path: string, home: string): string {
  */
 export function rootsFor(home: string, workspace?: string): { path: string; origin: string; native: boolean }[] {
   const list: { path: string; origin: string; native: boolean }[] = []
-  if (workspace) list.push({ path: join(workspace, '.agents', 'skills'), origin: 'workspace', native: true })
-  for (const root of ROOTS) list.push({ path: join(home, root.rel), origin: root.origin, native: root.native })
+  const seen = new Set<string>()
+  const push = (path: string, origin: string, native: boolean) => {
+    // Dedupe by resolved path. A dsh started in the home directory makes the
+    // workspace root and the user root the same directory, and scanning it
+    // twice produced a second row for every skill — the second one marked as
+    // shadowing the first, which is nonsense: a directory cannot shadow itself.
+    const key = resolve(path)
+    if (seen.has(key)) return
+    seen.add(key)
+    list.push({ path, origin, native })
+  }
+  if (workspace) push(join(workspace, '.agents', 'skills'), 'workspace', true)
+  for (const root of ROOTS) push(join(home, root.rel), root.origin, root.native)
   return list
 }
 

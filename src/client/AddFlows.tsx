@@ -290,13 +290,16 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
   return (
     <Modal title={t('directoryTitle')} lead={t('directoryLead')} onClose={onClose} wide>
       <input className="smc-input" placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
-      {state?.error ? (
-        <>
-          <div className="smc-err">{t('registryError', { error: state.error })}</div>
-          <div className="smc-hint">{t('registryHint')}</div>
-        </>
+      {state?.error ? <div className="smc-err">{t('registryError', { error: state.error })}</div> : null}
+      {state && !state.registry ? (
+        // No index configured is the normal starting state, not a failure —
+        // saying so beats reporting somebody's 404 as if something broke.
+        <div className="smc-empty">
+          <div>{t('registryUnset')}</div>
+          <div className="smc-hint" style={{ marginTop: 8 }}>{t('registryHint')}</div>
+        </div>
       ) : null}
-      {state && !state.error && shown.length === 0 ? <div className="smc-empty">{t('registryEmpty')}</div> : null}
+      {state?.registry && !state.error && shown.length === 0 ? <div className="smc-empty">{t('registryEmpty')}</div> : null}
       <div className="smc-cards">
         {shown.map(entry => (
           <div className="smc-card2" key={entry.name}>

@@ -42,8 +42,17 @@ function patchFile(home: string, profile = 'web'): string {
   return join(home, '.dsh', 'profiles', profile, 'cordis.patch.yml')
 }
 
-/** Where the panel looks for its curated skill index. */
-const DEFAULT_REGISTRY = process.env.SMC_REGISTRY_URL ?? 'https://skill.vyibc.com/index.json'
+/**
+ * Where the panel looks for its curated skill index.
+ *
+ * There is no default. The open Agent Skills format carries no version
+ * field, so an index that links straight at someone else's moving branch
+ * hands you a skill — a script holding your machine's credentials — that can
+ * change under you. Every deployment points this at an index it curates and
+ * pins itself, and until then the panel says so instead of reporting
+ * somebody's 404 as a failure.
+ */
+const DEFAULT_REGISTRY = process.env.SMC_REGISTRY_URL ?? ''
 
 /** Read-and-write service for both panels. */
 export class SkillMcpConsoleService extends TypertRemoteService {
@@ -293,6 +302,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     const installed = new Set((await scanSkills(this.home)).map(skill => skill.id))
     let entries: DirectoryEntry[] = []
     let error: string | null = null
+    if (!DEFAULT_REGISTRY) return JSON.stringify({ registry: '', entries, error: null })
     try {
       const response = await fetch(DEFAULT_REGISTRY, { redirect: 'follow' })
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
