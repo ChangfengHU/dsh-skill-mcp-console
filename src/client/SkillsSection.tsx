@@ -1,79 +1,130 @@
 /**
- * The Skills section: every skill on the machine, and what is inside each one.
+ * The Skills section.
  *
- * The list is grouped by origin rather than sorted flat, because "which agent
- * owns this root" is the first thing you need when the same skill name shows
- * up twice. Rows carry their `problem` inline — a skill with a broken
- * frontmatter is invisible from inside a session, and this panel is the only
- * place it can say why.
+ * Grouped by skill NAME rather than by root, because the question this
+ * panel exists to answer is "which copy of `fleet-proxy-switch` is dsh
+ * actually running" — and sorting by root puts the two copies four rows
+ * apart where nobody connects them. A shadowed row is dimmed, badged, and
+ * says which root beat it.
  *
  * @module dsh-skill-mcp-console/client/SkillsSection
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { SkillRow } from '../wire.ts'
+import type { SkillRow, SkillState } from '../wire.ts'
+import { AiFlow, CreateFlow, DirectoryFlow, InstallFlow, UploadFlow, type InstallApi } from './AddFlows.tsx'
+import type { ConsoleLocaleKey } from './locales.ts'
+import { StatePill, VerifyList, fill, tok, when, type T } from './ui.tsx'
 
 /** What the section calls back into the host with. */
-export interface SkillsApi {
+export interface SkillsApi extends InstallApi {
   skills: () => Promise<SkillRow[]>
   skillFile: (dir: string, path: string) => Promise<string>
+  setSkillState: (dir: string, state: SkillState) => Promise<void>
+  removeSkill: (dir: string) => Promise<string>
+  /** Put text into the chat composer; false when this build has no composer seam. */
+  insertPrompt: (text: string) => boolean
 }
 
-/** Human date for a mtime, or a dash when the scan found nothing to stat. */
-function when(ms: number): string {
-  if (!ms) return '—'
-  const date = new Date(ms)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`
+/** Dictionary key for one problem code. */
+const PROBLEM: Record<string, ConsoleLocaleKey> = {
+  noSkillMd: 'problemNoSkillMd',
+  noName: 'problemNoName',
+  nameMismatch: 'problemNameMismatch',
+  noDescription: 'problemNoDescription',
+  unreadable: 'problemUnreadable',
 }
 
-/** Render one skill's files and their contents. */
-function Detail({ skill, api, onBack }: { skill: SkillRow; api: SkillsApi; onBack: () => void }) {
+/** One skill's files and their contents. */
+function Detail({ skill, api, t, onBack, onChanged }: {
+  skill: SkillRow; api: SkillsApi; t: T; onBack: () => void; onChanged: () => void
+}) {
   const [path, setPath] = useState(skill.files.includes('SKILL.md') ? 'SKILL.md' : (skill.files[0] ?? ''))
   const [text, setText] = useState('')
+  const [raw, setRaw] = useState(true)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!path) return
     let live = true
-    setLoading(true)
     setError('')
     api.skillFile(skill.dir, path)
       .then(content => { if (live) setText(content) })
       .catch((cause: Error) => { if (live) setError(cause.message) })
-      .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
   }, [api, skill.dir, path])
 
+  // The rendered view strips the frontmatter fence: it is metadata the panel
+  // already shows above, and leaving it in makes every skill open on YAML.
+  const body = useMemo(() => {
+    if (raw || !text.startsWith('---')) return text
+    const close = text.indexOf('\n---', 3)
+    return close === -1 ? text : text.slice(close + 4).replace(/^\n+/, '')
+  }, [text, raw])
+
   return (
     <div className="smc-root">
-      <div className="smc-head">
-        <div>
-          <button className="smc-btn" onClick={onBack}>‹ 返回</button>
-        </div>
-        <div className="smc-spacer" />
-      </div>
+      <button className="smc-back" onClick={onBack}>‹ {t('back')}</button>
       <div className="smc-head">
         <div>
           <h3 className="smc-name">/{skill.id}</h3>
-          <p className="smc-mono">{skill.root}/{skill.id} · {skill.origin} · 更新于 {when(skill.updatedAt)}</p>
+          <div className="smc-mono">{skill.root}/{skill.id} · {skill.origin} · {when(skill.updatedAt)}</div>
         </div>
+        <div className="smc-spacer" />
+        <StatePill
+          state={skill.state}
+          t={t}
+          busy={busy}
+          onChange={next => {
+            setBusy(true)
+            api.setSkillState(skill.dir, next).then(onChanged).catch((cause: Error) => setError(cause.message)).finally(() => setBusy(false))
+          }}
+        />
+        <button
+          className="smc-btn"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true)
+            api.removeSkill(skill.dir)
+              .then(trash => { setError(fill(t('removed'), { path: trash })); onChanged(); onBack() })
+              .catch((cause: Error) => setError(cause.message))
+              .finally(() => setBusy(false))
+          }}
+        >{t('remove')}</button>
       </div>
-      {skill.problem ? <div className="smc-err">{skill.problem}</div> : null}
-      {skill.description ? <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, opacity: .82 }}>{skill.description}</p> : null}
+
+      {skill.shadowedBy ? <div className="smc-warnbox">{fill(t('shadowedNote'), { root: skill.shadowedBy })}</div> : null}
+      {skill.problem ? <div className="smc-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable')}</div> : null}
+      {!skill.native ? <div className="smc-hint">{t('nonNative')}</div> : null}
+      {skill.description ? <p className="smc-lede">{skill.description}</p> : null}
+      {skill.originalDescription ? (
+        <p className="smc-hint">
+          {t('stateNameOnly')} — {t('legendNameOnly')} · {tok(skill.fullTokens - skill.tokens)} tok {t('saved')}
+        </p>
+      ) : null}
+
       <div className="smc-detail">
         <div className="smc-tree">
           {skill.files.map(file => (
             <button key={file} aria-current={file === path} onClick={() => setPath(file)}>{file}</button>
           ))}
-          {skill.files.length === 0 ? <div style={{ padding: 8, opacity: .6 }}>(空目录)</div> : null}
+          {skill.files.length === 0 ? <div className="smc-hint" style={{ padding: 8 }}>{t('emptyDir')}</div> : null}
         </div>
         <div className="smc-pane">
-          <div className="smc-pane-bar"><span>{path || '(没有文件)'}</span></div>
-          {error
-            ? <div className="smc-err" style={{ margin: 12 }}>{error}</div>
-            : <pre className="smc-pre">{loading ? '读取中…' : text}</pre>}
+          <div className="smc-pane-bar">
+            <span>{path || '—'}</span>
+            <div className="smc-seg">
+              <button aria-selected={!raw} onClick={() => setRaw(false)} title={t('rendered')}>👁</button>
+              <button aria-selected={raw} onClick={() => setRaw(true)} title={t('source')}>&lt;/&gt;</button>
+              <button
+                title={t('copy')}
+                onClick={() => { void navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+              >{copied ? '✓' : '⧉'}</button>
+            </div>
+          </div>
+          {error ? <div className="smc-err" style={{ margin: 12 }}>{error}</div> : <pre className="smc-pre">{body}</pre>}
         </div>
       </div>
     </div>
@@ -81,11 +132,16 @@ function Detail({ skill, api, onBack }: { skill: SkillRow; api: SkillsApi; onBac
 }
 
 /** The Skills settings section. */
-export function SkillsSection({ api }: { api: SkillsApi }) {
+export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   const [rows, setRows] = useState<SkillRow[] | null>(null)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState<SkillRow | null>(null)
+  const [filter, setFilter] = useState<'all' | 'problems' | 'shadowed'>('all')
+  const [open, setOpen] = useState<string | null>(null)
+  const [busyDir, setBusyDir] = useState('')
+  const [flow, setFlow] = useState<'' | 'install' | 'upload' | 'create' | 'ai' | 'directory'>('')
+  const [seed, setSeed] = useState('')
+  const [menu, setMenu] = useState(false)
 
   const load = useCallback(() => {
     setError('')
@@ -93,65 +149,122 @@ export function SkillsSection({ api }: { api: SkillsApi }) {
   }, [api])
 
   useEffect(load, [load])
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menu])
 
   const shown = useMemo(() => {
     if (!rows) return []
     const needle = query.trim().toLowerCase()
-    if (!needle) return rows
-    return rows.filter(row =>
-      row.id.toLowerCase().includes(needle)
-      || row.name.toLowerCase().includes(needle)
-      || row.description.toLowerCase().includes(needle)
-      || row.origin.includes(needle))
-  }, [rows, query])
+    return rows
+      .filter(row => filter !== 'problems' || row.problem)
+      .filter(row => filter !== 'shadowed' || row.shadowedBy)
+      .filter(row => !needle
+        || row.id.toLowerCase().includes(needle)
+        || row.description.toLowerCase().includes(needle)
+        || row.origin.includes(needle))
+      // Group by name so the copies of one skill sit together and the
+      // shadowing is visible; within a name, the winning root comes first.
+      .sort((a, b) => a.id.localeCompare(b.id)
+        || Number(Boolean(a.shadowedBy)) - Number(Boolean(b.shadowedBy)))
+  }, [rows, query, filter])
 
-  if (open) return <Detail skill={open} api={api} onBack={() => setOpen(null)} />
+  const current = rows?.find(row => row.dir === open) ?? null
+  if (current) {
+    return <Detail skill={current} api={api} t={t} onBack={() => setOpen(null)} onChanged={load} />
+  }
 
-  const broken = rows?.filter(row => row.problem).length ?? 0
+  const problems = rows?.filter(row => row.problem).length ?? 0
+  const shadowed = rows?.filter(row => row.shadowedBy).length ?? 0
+  const resident = rows?.filter(row => !row.shadowedBy && row.state !== 'off' && row.state !== 'user-only')
+    .reduce((sum, row) => sum + row.tokens, 0) ?? 0
+  const savings = rows?.reduce((sum, row) => sum + Math.max(0, row.fullTokens - row.tokens), 0) ?? 0
+
+  const changeState = (row: SkillRow, next: SkillState) => {
+    setBusyDir(row.dir)
+    api.setSkillState(row.dir, next).then(load).catch((cause: Error) => setError(cause.message)).finally(() => setBusyDir(''))
+  }
 
   return (
     <div className="smc-root">
       <div className="smc-head">
         <div>
-          <h3>Skills</h3>
-          <p>这台机器上所有技能根目录里的技能。点一行看它的文件和正文。</p>
+          <h3>{t('skillsTitle')}</h3>
+          <p>{t('skillsLead')}</p>
         </div>
         <div className="smc-spacer" />
-        <button className="smc-btn" onClick={load}>重新扫描</button>
+        <button className="smc-btn" onClick={() => setFlow('directory')}>{t('browse')}</button>
+        <div className="smc-menu">
+          <button className="smc-btn smc-primary" onClick={event => { event.stopPropagation(); setMenu(value => !value) }}>{t('add')} ▾</button>
+          {menu ? (
+            <div className="smc-menu-list" onClick={event => event.stopPropagation()}>
+              <button onClick={() => { setSeed(''); setFlow('install'); setMenu(false) }}><span className="smc-g">$</span>{t('addCommand')}</button>
+              <button onClick={() => { setFlow('upload'); setMenu(false) }}><span className="smc-g">↑</span>{t('addUpload')}</button>
+              <button onClick={() => { setFlow('create'); setMenu(false) }}><span className="smc-g">✎</span>{t('addCreate')}</button>
+              <button onClick={() => { setFlow('ai'); setMenu(false) }}><span className="smc-g">✳</span>{t('addAi')}</button>
+              <hr />
+              <button onClick={() => { setFlow('directory'); setMenu(false) }}><span className="smc-g">⌂</span>{t('addDirectory')}</button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {error ? <div className="smc-err">{error}</div> : null}
 
       <div className="smc-bar">
-        <input
-          className="smc-input"
-          placeholder="搜索技能…"
-          aria-label="搜索技能"
-          value={query}
-          onChange={event => setQuery(event.target.value)}
-        />
-        <span>
-          {rows === null ? '扫描中…' : <>共 <b>{rows.length}</b> 个{broken ? <> · <span style={{ color: '#b07908' }}>{broken} 个有问题</span></> : null}</>}
+        <input className="smc-input" placeholder={t('search')} aria-label={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
+        <div className="smc-switch">
+          <button aria-selected={filter === 'all'} onClick={() => setFilter('all')}>{t('filterAll')}</button>
+          <button aria-selected={filter === 'problems'} onClick={() => setFilter('problems')}>{t('filterProblems')} {problems}</button>
+          <button aria-selected={filter === 'shadowed'} onClick={() => setFilter('shadowed')}>{t('filterShadowed')} {shadowed}</button>
+        </div>
+        <button className="smc-btn" onClick={load}>{t('rescan')}</button>
+      </div>
+
+      <div className="smc-bar">
+        <span>{rows === null ? '…' : <><b>{rows.length}</b> {t('countSkills')}</>}</span>
+        <span className="smc-budget">
+          <span className="smc-bl">{t('resident')} {t('approx')}</span>
+          <b>{tok(resident)}</b> tok
+          {savings > 0 ? <span className="smc-bd">↓{tok(savings)}</span> : null}
         </span>
       </div>
 
       {rows !== null && shown.length === 0
-        ? <div className="smc-empty">{rows.length === 0 ? '没有扫到任何技能。' : '没有匹配的技能。'}</div>
+        ? <div className="smc-empty">{rows.length === 0 ? t('noSkills') : t('noMatch')}</div>
         : (
           <div style={{ overflowX: 'auto' }}>
             <table className="smc-table">
               <thead>
-                <tr><th>Skill</th><th>来源</th><th>目录</th><th>更新</th></tr>
+                <tr>
+                  <th>{t('colSkill')}</th><th>{t('colState')}</th><th>{t('colCost')}</th><th>{t('colSource')}</th><th>{t('colUpdated')}</th>
+                </tr>
               </thead>
               <tbody>
                 {shown.map(row => (
-                  <tr key={row.dir} className="smc-click" onClick={() => setOpen(row)}>
+                  <tr
+                    key={row.dir}
+                    className={`smc-click${row.shadowedBy || row.state === 'off' ? ' smc-dim' : ''}`}
+                    onClick={() => setOpen(row.dir)}
+                  >
                     <td>
-                      <div className="smc-name">/{row.id}</div>
+                      <div className="smc-name">
+                        /{row.id}
+                        {row.shadowedBy ? <span className="smc-chip smc-warn" style={{ marginLeft: 7 }}>{t('filterShadowed')}</span> : null}
+                        {!row.native ? <span className="smc-chip" style={{ marginLeft: 7 }}>bridge</span> : null}
+                      </div>
                       {row.description ? <div className="smc-desc">{row.description}</div> : null}
-                      {row.problem ? <div className="smc-problem">{row.problem}</div> : null}
+                      {row.shadowedBy ? <div className="smc-problem">{fill(t('shadowedNote'), { root: row.shadowedBy })}</div> : null}
+                      {row.problem ? <div className="smc-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable')}</div> : null}
                     </td>
-                    <td><span className="smc-chip">{row.origin}</span></td>
+                    <td><StatePill state={row.state} t={t} busy={busyDir === row.dir} onChange={next => changeState(row, next)} /></td>
+                    <td className="smc-tok">
+                      <b>{row.tokens}</b><span>tok</span>
+                      {row.fullTokens > row.tokens ? <em>{t('saved')} {row.fullTokens - row.tokens}</em> : null}
+                    </td>
                     <td className="smc-mono">{row.root}</td>
                     <td className="smc-mono">{when(row.updatedAt)}</td>
                   </tr>
@@ -160,6 +273,23 @@ export function SkillsSection({ api }: { api: SkillsApi }) {
             </table>
           </div>
         )}
+
+      <div className="smc-legend">
+        <span><i className="smc-s-on">{t('stateOn')}</i> {t('legendOn')}</span>
+        <span><i className="smc-s-name">{t('stateNameOnly')}</i> {t('legendNameOnly')}</span>
+        <span><i className="smc-s-user">{t('stateUserOnly')}</i> {t('legendUserOnly')}</span>
+        <span><i className="smc-s-off">{t('stateOff')}</i> {t('legendOff')}</span>
+      </div>
+
+      {flow === 'install' ? <InstallFlow api={api} t={t} seed={seed} onClose={() => setFlow('')} onDone={load} /> : null}
+      {flow === 'upload' ? <UploadFlow api={api} t={t} onClose={() => setFlow('')} onDone={load} /> : null}
+      {flow === 'create' ? <CreateFlow api={api} t={t} onClose={() => setFlow('')} onDone={load} /> : null}
+      {flow === 'ai' ? <AiFlow t={t} onClose={() => setFlow('')} onInsert={api.insertPrompt} /> : null}
+      {flow === 'directory' ? (
+        <DirectoryFlow api={api} t={t} onClose={() => setFlow('')} onInstall={install => { setSeed(install); setFlow('install') }} />
+      ) : null}
     </div>
   )
 }
+
+export { VerifyList }

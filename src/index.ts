@@ -1,22 +1,25 @@
 /**
  * `dsh-skill-mcp-console` — Skills and MCP as two top-level Settings sections.
  *
- * Why this exists, given how many capability managers the ecosystem already
- * has: every one we measured fails at least one of these, and all four are
- * load-bearing for a deployment reached over a domain rather than localhost.
+ * Why this exists, given how many capability panels the ecosystem already
+ * has: every one measured before writing it fails at least one of these, and
+ * all of them are load-bearing for a dsh reached over a domain rather than
+ * `localhost`.
  *
- * - Top level. Registering into `settings.section`, not
+ * - **Top level.** Registers into `settings.section`, not
  *   `settings.plugins.tab` — a panel nested inside Settings → Plugins is a
  *   panel nobody finds.
- * - No loopback fence. Several managers refuse any request whose `Host`
- *   header is not `localhost`, which is a correct default for a plugin that
- *   renames files under skill roots, and fatal for a dsh reached through a
- *   tunnel. This plugin reads through the Remote seam the app already
- *   authenticates, so it works wherever the app works.
- * - Both halves, one shell. Skills and MCP are the same question asked twice
- *   — what can this agent do — so they share one plugin and one vocabulary.
- * - Universal `mcpServers`. dsh stores cordis patch entries; the rest of the
- *   world writes `mcpServers`. The JSON view speaks the world's dialect.
+ * - **No loopback fence.** Several skill managers refuse any request whose
+ *   `Host` header is not `localhost`. That is a correct default for a plugin
+ *   that renames files under skill roots, and fatal behind a tunnel. This
+ *   one reads through the Remote seam the app already authenticates.
+ * - **Shadowing made visible.** dsh resolves duplicate skill names
+ *   first-wins and, in its own words, "there is no API to inspect all
+ *   shadowed definitions". Scanning the filesystem is the only way to see
+ *   which copies lost, and this panel says so per row.
+ * - **Universal `mcpServers`.** dsh stores cordis patch entries; the rest of
+ *   the world writes `mcpServers`. The JSON view reads and writes the
+ *   world's dialect and translates on save.
  *
  * Function plugin — no default export (the Loader unwraps
  * `exports.default ?? exports`).
@@ -33,9 +36,26 @@ export const name = 'skill-mcp-console'
 export const inject = ['tools', 'loader']
 
 export { SkillMcpConsoleService } from './service.ts'
-export { scanSkills, readSkillFile, parseFrontmatter, tildify } from './skills.ts'
-export type { SkillRow, McpRow } from './wire.ts'
-export { CONSOLE_INVOCATIONS, PKG } from './wire.ts'
+export {
+  ROOTS, parseFrontmatter, readOverrides, readSkillFile, removeSkill, rootsFor,
+  scanSkills, setSkillState, stateOf, tildify, writeOverrides,
+} from './skills.ts'
+export {
+  MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, policyPath, readToolPolicy,
+  setDisabled, toUniversal, writeToolPolicy,
+} from './mcpconfig.ts'
+export {
+  cleanup, createSkill, detect, findSkills, peek, place, run, runShell, stage,
+  uploadSkill, verify,
+} from './install.ts'
+export { estimateToolTokens, estimateTokens, formatTokens } from './tokens.ts'
+export { CONSOLE_INVOCATIONS, METHODS, PKG } from './wire.ts'
+export type {
+  DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, SkillRow,
+  SkillState, VerifyCheck,
+} from './wire.ts'
+export type { Frontmatter, OverrideFile } from './skills.ts'
+export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
 
 /**
  * Mount the Remote service both panels call.

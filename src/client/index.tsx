@@ -4,21 +4,23 @@
  *
  * `settings.section` is the deliberate choice. The same panels registered
  * into `settings.plugins.tab` would sit two clicks deep inside Settings →
- * Plugins, which is where the ecosystem's other MCP panels live and why
- * people report not being able to find them.
+ * Plugins, which is where the ecosystem's other capability panels live and
+ * why people report not finding them.
  *
  * @module dsh-skill-mcp-console/client
  */
 
+import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
+import { McpSection, type McpApi } from './McpSection.tsx'
+import { SkillsSection, type SkillsApi } from './SkillsSection.tsx'
+import { en, zh, type ConsoleLocaleKey } from './locales.ts'
 import { CONSOLE_REMOTE, unwrap } from './remote.ts'
 import { installStyles } from './styles.ts'
-import { SkillsSection } from './SkillsSection.tsx'
-import { McpSection } from './McpSection.tsx'
-import { en, zh, type ConsoleLocaleKey } from './locales.ts'
-import type { McpRow, SkillRow } from '../wire.ts'
+import { fill } from './ui.tsx'
 
 export { SkillsSection } from './SkillsSection.tsx'
 export { McpSection } from './McpSection.tsx'
+export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'settings.skillMcpConsole'
@@ -28,8 +30,6 @@ export const name = 'dsh-skill-mcp-console'
 
 /** `remote.skillMcpConsole` appears once this plugin mounts its contribution. */
 export const inject = ['slots', 'locale', 'remote']
-
-export type { ConsoleLocaleKey }
 
 /**
  * Client plugin body: dictionaries, stylesheet, Remote mount, two sections.
@@ -42,21 +42,45 @@ export async function apply(ctx: any): Promise<void> {
 
   await ctx.remote.$mount(CONSOLE_REMOTE)
 
-  const t = ctx.locale.bind(NS)
-  const remote = () => ctx.get('remote.skillMcpConsole')
+  const bound = ctx.locale.bind(NS)
+  /** Translate, then substitute `{placeholders}`. */
+  const t = (key: ConsoleLocaleKey, params?: Record<string, string | number>) => fill(String(bound(key) ?? key), params)
 
-  const skillsApi = {
-    skills: async (): Promise<SkillRow[]> =>
-      JSON.parse(unwrap<string>(await remote().skills(), 'skills')),
-    skillFile: async (dir: string, path: string): Promise<string> =>
-      JSON.parse(unwrap<string>(await remote().skillFile(JSON.stringify({ dir, path })), 'skillFile')).text,
+  const remote = () => ctx.get('remote.skillMcpConsole')
+  const call = async <T,>(method: string, payload?: unknown): Promise<T> => {
+    const service = remote()
+    const result = payload === undefined ? await service[method]() : await service[method](JSON.stringify(payload))
+    return JSON.parse(unwrap<string>(result, method)) as T
   }
 
-  const mcpApi = {
-    mcp: async (): Promise<McpRow[]> =>
-      JSON.parse(unwrap<string>(await remote().mcp(), 'mcp')),
-    mcpJson: async (): Promise<string> =>
-      unwrap<string>(await remote().mcpJson(), 'mcpJson'),
+  const install = {
+    detectInstall: (input: string) => call<InstallPlan>('detectInstall', { input }),
+    peekInstall: async (plan: InstallPlan) => (await call<{ text: string }>('peekInstall', { plan })).text,
+    stageInstall: (plan: InstallPlan) => call<{ token: string; candidates: InstallCandidate[]; log: string }>('stageInstall', { plan }),
+    runInstall: (token: string, chosen: string[]) =>
+      call<{ code: number; log: string; installed: string[]; checks: { dir: string; checks: VerifyCheck[] }[] }>('runInstall', { token, chosen }),
+    createSkill: (name_: string, description: string, instructions: string) =>
+      call<{ dir: string; checks: VerifyCheck[] }>('createSkill', { name: name_, description, instructions }),
+    uploadSkill: (filename: string, base64: string) =>
+      call<{ dir: string; checks: VerifyCheck[] }>('uploadSkill', { filename, base64 }),
+    directory: () => call<{ registry: string; entries: DirectoryEntry[]; error: string | null }>('directory'),
+  }
+
+  const skillsApi: SkillsApi = {
+    ...install,
+    skills: () => call<SkillRow[]>('skills'),
+    skillFile: async (dir, path) => (await call<{ text: string }>('skillFile', { dir, path })).text,
+    setSkillState: async (dir, state: SkillState) => { await call('setSkillState', { dir, state }) },
+    removeSkill: async dir => (await call<{ trash: string }>('removeSkill', { dir })).trash,
+    insertPrompt: text => insertIntoComposer(text),
+  }
+
+  const mcpApi: McpApi = {
+    mcp: () => call<McpRow[]>('mcp'),
+    mcpJson: async () => JSON.stringify(await call<unknown>('mcpJson'), null, 2),
+    saveMcpJson: text => call<{ added: string[]; updated: string[]; removed: string[]; backup: string }>('saveMcpJson', { text }),
+    setMcpDisabled: async (name_, disabled) => { await call('setMcpDisabled', { name: name_, disabled }) },
+    setToolDisabled: async (server, tool, disabled) => { await call('setToolDisabled', { server, tool, disabled }) },
   }
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -65,7 +89,7 @@ export async function apply(ctx: any): Promise<void> {
     order: 26,
     label: () => t('skillsNav'),
     locale: NS,
-    inject: () => ({ api: skillsApi }),
+    inject: () => ({ api: skillsApi, t }),
   }, SkillsSection))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -74,6 +98,30 @@ export async function apply(ctx: any): Promise<void> {
     order: 27,
     label: () => t('mcpNav'),
     locale: NS,
-    inject: () => ({ api: mcpApi }),
+    inject: () => ({ api: mcpApi, t }),
   }, McpSection))
+}
+
+/**
+ * Drop text into the chat composer.
+ *
+ * There is no published seam for this, so it goes through the DOM: find the
+ * composer textarea, set its value the way React will notice, and fire the
+ * events a controlled input listens for. It degrades to `false` rather than
+ * throwing, and the caller falls back to the clipboard — a prompt on the
+ * clipboard is a small inconvenience, a thrown error in a settings panel is
+ * not.
+ */
+function insertIntoComposer(text: string): boolean {
+  try {
+    const field = document.querySelector<HTMLTextAreaElement>('textarea[placeholder], textarea')
+    if (!field) return false
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+    setter?.call(field, text)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    field.focus()
+    return true
+  } catch {
+    return false
+  }
 }

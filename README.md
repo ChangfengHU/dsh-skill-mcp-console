@@ -49,12 +49,37 @@ entry's disabled flag, its cordis fiber phase, and the tools that really
 exist. Credentials never leave the host: header and env **names** are shown,
 their values are masked before the snapshot is built.
 
-## Not in this version
+## Getting skills in
 
-The JSON view is read-only. Translating `mcpServers` back into cordis patch
-entries is the write path, and shipping a Save button before that round-trip
-is proven would risk the one file that holds every server's credentials.
-Enable/disable toggles wait on the same work.
+`Add` offers five routes, and `Browse` opens the curated directory.
+
+- **From a command or link.** GitHub first, because that is where skills
+  live: a full URL, a `user/repo` shorthand, a `github:` spec, or a deep link
+  at `…/tree/<branch>/<dir>`. Also `git clone`, a URL pointing straight at a
+  `SKILL.md` or an archive, and `bash <(curl …)` for publishers who ship an
+  installer. A repository routinely carries a dozen skills, so the ones found
+  are listed and you pick.
+- **Upload**, **Create** from three fields, or **Have dsh write one**, which
+  drops a prompt into the composer rather than showing another form.
+
+Whatever the route, the install ends with four checks — `SKILL.md` present,
+frontmatter complete, scripts executable, and **the skill actually visible in
+the registry**. That last one is the one that catches real failures: files can
+all be correct while the skill never loads, because dsh keys the registry on
+the directory name and the frontmatter says something else. An installer that
+prints a menu and copies nothing still exits 0.
+
+## What it does not do
+
+No connection dot. dsh's official MCP client exposes no status seam, so a
+green light would be invented.
+
+`name-only` has no equivalent in dsh — the registry carries exactly two
+policy booleans. It is implemented by parking the full description in this
+plugin's own file and writing the skill's name in its place, so the model
+still knows the skill exists without paying for the prose. Reverting restores
+the original text verbatim, and every frontmatter edit is backed up into
+`<skill>/.smc-backup/` first.
 
 ## Development
 
@@ -129,11 +154,31 @@ dsh plugin --profile web add dsh-skill-mcp-console
 就是编的。行里只显示能确知的:条目是否停用、cordis fiber 阶段、以及真实存在
 的工具。凭据不出宿主:header 和 env 的**名字**会显示,值在快照生成前就被遮蔽。
 
-## 本版没有的
+## 技能怎么装进来
 
-JSON 视图是只读的。把 `mcpServers` 反向翻译成 cordis 补丁条目是写入路径,在
-这个往返没验证透之前就放一个保存按钮,拿整个机器所有服务器的凭据去赌,不值。
-启停开关同理,等同一批工作。
+`Add` 有五条路,`Browse` 打开收录目录。
+
+- **从命令或链接安装** —— GitHub 优先,因为技能就长在那儿:完整地址、
+  `user/repo` 简写、`github:` 写法,或带 `…/tree/<分支>/<子目录>` 的深链。
+  也认 `git clone`、直接指向 `SKILL.md` 或压缩包的 URL,以及
+  `bash <(curl …)` —— 有些发布者出的就是这个。一个仓库常常装着十几个技能,
+  所以会列出来让你勾。
+- **上传**、**三格表单新建**,或者**让 dsh 帮我写** —— 后者不再弹表单,
+  把 prompt 送进输入框,交给 agent 自己问自己写。
+
+不管走哪条,安装都以四条校验收尾:`SKILL.md` 在不在、frontmatter 全不全、
+脚本有没有执行位,以及**技能有没有真的出现在注册表里**。最后一条才是抓真
+故障的:文件可以全都对,技能却根本不加载 —— 因为 dsh 按目录名建索引,而
+frontmatter 里写的是别的名字。**打个菜单什么都没装的安装脚本,退出码一样是 0。**
+
+## 它不做什么
+
+**没有连接状态灯。** dsh 官方 MCP 客户端不暴露状态接口,点个绿灯就是编的。
+
+**`仅名字` 这一档 dsh 里没有对应语义** —— 注册表只有两个策略布尔值。它是这样
+实现的:把完整描述存进本插件自己的文件,frontmatter 里换成技能名,模型仍然
+知道这个技能存在,但不再为那段长文付费。切回去时原文逐字恢复,而且每次改
+frontmatter 之前都会先备份到 `<技能>/.smc-backup/`。
 
 ## 授权
 

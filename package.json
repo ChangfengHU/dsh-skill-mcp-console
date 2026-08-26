@@ -1,6 +1,6 @@
 {
   "name": "dsh-skill-mcp-console",
-  "version": "0.1.2",
+  "version": "0.2.2",
   "description": "Skills and MCP servers in two top-level Settings sections for DeepSeek Harness: every skill root scanned (not just one namespace), SKILL.md rendered or raw, MCP servers with their live tool inventory, and the config shown as the universal mcpServers JSON everyone else writes. · 技能与 MCP 控制台:两个顶层菜单,扫全部技能根目录,MCP 配置用通用 mcpServers 格式呈现。",
   "keywords": [
     "dsh",
@@ -62,6 +62,7 @@
     "react": "^18.2.0"
   },
   "dependencies": {
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   }
 }
