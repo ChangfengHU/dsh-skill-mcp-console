@@ -22,6 +22,7 @@ export interface InstallApi {
   createSkill: (name: string, description: string, instructions: string) => Promise<{ dir: string; checks: VerifyCheck[] }>
   uploadSkill: (filename: string, base64: string) => Promise<{ dir: string; checks: VerifyCheck[] }>
   directory: (query: string, topic: string) => Promise<{ topics: string[]; topic: string; entries: DirectoryEntry[]; error: string | null }>
+  repoReadme: (repo: string) => Promise<string>
 }
 
 /** Install from a pasted repository address or command. */
@@ -296,6 +297,7 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState('agent-skills')
   const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState<DirectoryEntry | null>(null)
 
   const load = useCallback((nextQuery: string, nextTopic: string) => {
     setBusy(true)
@@ -306,6 +308,8 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
   }, [api])
 
   useEffect(() => { load('', 'agent-skills') }, [load])
+
+  if (open) return <RepoDetail entry={open} api={api} t={t} onBack={() => setOpen(null)} onInstall={install => { onInstall(install); onClose() }} />
 
   return (
     <Modal title={t('directoryTitle')} lead={t('directoryLead')} onClose={onClose} wide>
@@ -341,7 +345,7 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
         {(state?.entries ?? []).map(entry => (
           <div className="smc-card2" key={entry.name}>
             <div className="smc-card-top">
-              <span className="smc-cn">{entry.name}</span>
+              <button className="smc-cn smc-link" onClick={() => setOpen(entry)}>{entry.name}</button>
               <button
                 className={`smc-act${entry.installed ? ' smc-act-on' : ''}`}
                 aria-label={entry.installed ? t('installed') : t('install')}
@@ -359,6 +363,47 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
 
       <p className="smc-hint">{t('directoryNote')}</p>
       <div className="smc-foot"><button className="smc-btn" onClick={onClose}>{t('cancel')}</button></div>
+    </Modal>
+  )
+}
+
+/**
+ * One repository, read before it is installed.
+ *
+ * Deliberately the raw README rather than a rendered one: what matters here
+ * is what the repository actually says about itself, and a half-rendered
+ * Markdown pane invites you to skim what you came to read carefully.
+ */
+function RepoDetail({ entry, api, t, onBack, onInstall }: {
+  entry: DirectoryEntry; api: InstallApi; t: T; onBack: () => void; onInstall: (install: string) => void
+}) {
+  const [text, setText] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let live = true
+    api.repoReadme(entry.name)
+      .then(readme => { if (live) setText(readme) })
+      .catch((cause: Error) => { if (live) setError(cause.message) })
+    return () => { live = false }
+  }, [api, entry.name])
+
+  return (
+    <Modal title={entry.name} lead={entry.description} onClose={onBack} wide>
+      <div className="smc-bar">
+        <button className="smc-btn" onClick={onBack}>‹ {t('back')}</button>
+        <span className="smc-chip">{entry.source}</span>
+        <a className="smc-btn" href={entry.install} target="_blank" rel="noreferrer noopener">{t('openOnGithub')}</a>
+        <span className="smc-spacer" />
+        <button className="smc-btn smc-primary" onClick={() => onInstall(entry.install)}>{t('installReview')}</button>
+      </div>
+      {error ? <div className="smc-err">{error}</div> : null}
+      <div className="smc-pane">
+        <div className="smc-pane-bar"><span>README</span></div>
+        <pre className="smc-pre">{text || (error ? '' : '…')}</pre>
+      </div>
+      <p className="smc-hint">{t('directoryNote')}</p>
+      <div className="smc-foot"><button className="smc-btn" onClick={onBack}>{t('back')}</button></div>
     </Modal>
   )
 }

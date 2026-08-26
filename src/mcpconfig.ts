@@ -25,6 +25,31 @@ import { isMap, isSeq, parseDocument, YAMLMap, YAMLSeq, type Document } from 'ya
 /** The one official MCP bridge. Entries naming anything else are not servers. */
 export const MCP_CLIENT_MODULE = '@deepseek-ai/dsh-mcp-client'
 
+/**
+ * Cordis fiber states, as words.
+ *
+ * The raw value is a number, and a chip reading "2" tells nobody anything.
+ */
+const FIBER_PHASE: Record<string, string> = {
+  '0': 'pending', '1': 'loading', '2': 'active', '3': 'failed', '4': 'disposed', '5': 'unloading',
+}
+
+/**
+ * The fiber's phase as a word, or null while it is simply healthy.
+ *
+ * `active` is the state every working entry is in, so reporting it would put
+ * a badge on every row that carries no information; a phase worth a glance
+ * is one that is something else. Lives here, next to the other pure MCP
+ * logic, so it can be tested without standing up a cordis context — it went
+ * missing once in a refactor and took the whole MCP panel down with a
+ * ReferenceError that no test could have caught from where it used to live.
+ */
+export function phaseOf(fiber: { state: unknown } | undefined | null): string | null {
+  if (fiber === undefined || fiber === null) return null
+  const phase = FIBER_PHASE[String(fiber.state)] ?? String(fiber.state)
+  return phase === 'active' ? null : phase
+}
+
 /** Keys copied straight through in both directions. */
 const PASSTHROUGH = ['headers', 'env', 'toolCallTimeoutMs', 'failOnStartupError', 'cwd'] as const
 

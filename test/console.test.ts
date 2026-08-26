@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { detect, findSkills, verify } from '../src/install.ts'
-import { fromUniversal, toUniversal } from '../src/mcpconfig.ts'
+import { fromUniversal, phaseOf, toUniversal } from '../src/mcpconfig.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
 
@@ -272,6 +272,19 @@ describe('mcpconfig', () => {
     delete servers.added
     const result = await fromUniversal(file, servers)
     assert.deepEqual(result.removed, ['added'])
+  })
+})
+
+describe('phaseOf', () => {
+  it('turns the raw enum into a word and hides the healthy one', () => {
+    // A chip reading "2" says nothing, and one that is always present says
+    // nothing either. This function vanished in a refactor once and took the
+    // whole MCP panel down with a ReferenceError, so it is tested.
+    assert.equal(phaseOf({ state: 2 }), null)
+    assert.equal(phaseOf({ state: 3 }), 'failed')
+    assert.equal(phaseOf({ state: 1 }), 'loading')
+    assert.equal(phaseOf(undefined), null)
+    assert.equal(phaseOf({ state: 99 }), '99')
   })
 })
 

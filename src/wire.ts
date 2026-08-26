@@ -48,7 +48,7 @@ export const METHODS = [
   ['skills', 0], ['skillFile', 1], ['setSkillState', 1], ['removeSkill', 1],
   ['mcp', 0], ['mcpJson', 0], ['saveMcpJson', 1], ['setMcpDisabled', 1], ['setToolDisabled', 1],
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
-  ['createSkill', 1], ['uploadSkill', 1], ['directory', 1],
+  ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */

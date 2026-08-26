@@ -5,7 +5,7 @@
  * @module dsh-skill-mcp-console/client/ui
  */
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { SkillState, VerifyCheck } from '../wire.ts'
 import type { ConsoleLocaleKey } from './locales.ts'
 
@@ -44,19 +44,62 @@ export function stateClass(state: SkillState): string {
   return state === 'on' ? 'smc-s-on' : state === 'name-only' ? 'smc-s-name' : state === 'user-only' ? 'smc-s-user' : 'smc-s-off'
 }
 
-/** A clickable pill that cycles a skill through the four states. */
+/** Dictionary key for one state's one-line explanation. */
+function stateLegend(state: SkillState): ConsoleLocaleKey {
+  return state === 'on' ? 'legendOn' : state === 'name-only' ? 'legendNameOnly' : state === 'user-only' ? 'legendUserOnly' : 'legendOff'
+}
+
+/**
+ * The state control: a pill that opens a menu of the four states, each with
+ * the sentence that says what it does.
+ *
+ * It used to cycle on click, which meant up to three blind presses to reach
+ * the state you wanted and no way to see what the others were without
+ * pressing them — and two of these states edit a file on disk.
+ */
 export function StatePill({ state, t, onChange, busy }: { state: SkillState; t: T; onChange: (next: SkillState) => void; busy?: boolean }) {
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    if (!at) return
+    const close = () => setAt(null)
+    document.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    return () => { document.removeEventListener('click', close); window.removeEventListener('scroll', close, true) }
+  }, [at])
+
   return (
-    <button
-      type="button"
-      className={`smc-state ${stateClass(state)}`}
-      disabled={busy}
-      title={t(state === 'on' ? 'legendOn' : state === 'name-only' ? 'legendNameOnly' : state === 'user-only' ? 'legendUserOnly' : 'legendOff')}
-      onClick={event => {
-        event.stopPropagation()
-        onChange(STATES[(STATES.indexOf(state) + 1) % STATES.length])
-      }}
-    >{busy ? '…' : t(stateLabel(state))}</button>
+    <span className="smc-state-wrap">
+      <button
+        type="button"
+        className={`smc-state ${stateClass(state)}`}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={at !== null}
+        title={t(stateLegend(state))}
+        onClick={event => {
+          event.stopPropagation()
+          if (at) { setAt(null); return }
+          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+          setAt({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 268) })
+        }}
+      >{busy ? '…' : t(stateLabel(state))}</button>
+      {at ? (
+        <div className="smc-state-menu" role="menu" style={{ top: at.top, left: Math.max(8, at.left) }} onClick={event => event.stopPropagation()}>
+          {STATES.map(option => (
+            <button
+              key={option}
+              role="menuitemradio"
+              aria-current={option === state}
+              onClick={() => { setAt(null); if (option !== state) onChange(option) }}
+            >
+              <i className={stateClass(option)}>{t(stateLabel(option))}</i>
+              <small>{t(stateLegend(option))}</small>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
   )
 }
 

@@ -65,6 +65,7 @@ export async function apply(ctx: any): Promise<void> {
       call<{ dir: string; checks: VerifyCheck[] }>('uploadSkill', { filename, base64 }),
     directory: (query: string, topic: string) =>
       call<{ topics: string[]; topic: string; entries: DirectoryEntry[]; error: string | null }>('directory', { query, topic }),
+    repoReadme: async (repo: string) => (await call<{ text: string }>('repoReadme', { repo })).text,
   }
 
   const skillsApi: SkillsApi = {

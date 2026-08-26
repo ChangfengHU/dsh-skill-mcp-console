@@ -22,7 +22,7 @@ import {
   cleanup, createSkill, detect, findSkills, peek, place, runShell, stage, uploadSkill, verify,
 } from './install.ts'
 import {
-  MCP_CLIENT_MODULE, fromUniversal, readToolPolicy, setDisabled, toUniversal, writeToolPolicy,
+  MCP_CLIENT_MODULE, fromUniversal, phaseOf, readToolPolicy, setDisabled, toUniversal, writeToolPolicy,
   type UniversalServer,
 } from './mcpconfig.ts'
 import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.ts'
@@ -31,19 +31,6 @@ import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wi
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
-
-/**
- * Cordis fiber states, as words.
- *
- * The raw value is a number, and a chip reading "2" tells nobody anything.
- * `active` is also the state every healthy entry is in, so the row reports
- * the phase only when it is something else — a badge that is always present
- * carries no information, and one that appears only when something is off
- * is worth glancing at.
- */
-const FIBER_PHASE: Record<string, string> = {
-  '0': 'pending', '1': 'loading', '2': 'active', '3': 'failed', '4': 'disposed', '5': 'unloading',
-}
 
 /** Where a skill installed through this panel lands. */
 function defaultRoot(home: string): string {
@@ -374,6 +361,26 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     } catch (cause) {
       return JSON.stringify({ topics: SKILL_TOPICS, topic: chosenTopic, entries: [], error: (cause as Error).message })
     }
+  }
+
+  /**
+   * One repository's README, so a skill can be read before it is trusted.
+   *
+   * Browse used to jump straight from a search result into the install flow,
+   * which is a strange thing to ask of someone: decide to run third-party
+   * code on the strength of a one-line description. The README is the only
+   * thing most repositories offer as an explanation, so it goes in front of
+   * the decision rather than after it.
+   */
+  async repoReadme(payload: string): Promise<string> {
+    const { repo } = JSON.parse(payload) as { repo: string }
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error('expected owner/repo')
+    const headers: Record<string, string> = { accept: 'application/vnd.github.raw', 'user-agent': 'dsh-skill-mcp-console' }
+    if (process.env.SMC_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.SMC_GITHUB_TOKEN}`
+    const response = await fetch(`https://api.github.com/repos/${repo}/readme`, { headers })
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    const text = await response.text()
+    return JSON.stringify({ text: text.length > 60_000 ? text.slice(0, 60_000) + '\n\n…' : text })
   }
 }
 

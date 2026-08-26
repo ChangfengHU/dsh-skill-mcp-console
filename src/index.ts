@@ -41,7 +41,7 @@ export {
   scanSkills, setSkillState, stateOf, tildify, writeOverrides,
 } from './skills.ts'
 export {
-  MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, policyPath, readToolPolicy,
+  MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, phaseOf, policyPath, readToolPolicy,
   setDisabled, toUniversal, writeToolPolicy,
 } from './mcpconfig.ts'
 export {

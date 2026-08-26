@@ -26,6 +26,9 @@ export interface SkillsApi extends InstallApi {
   insertPrompt: (text: string) => boolean
 }
 
+/** Rows per page. Enough to scan, few enough that the table stays short. */
+const PAGE_SIZE = 12
+
 /** Dictionary key for one problem code. */
 const PROBLEM: Record<string, ConsoleLocaleKey> = {
   noSkillMd: 'problemNoSkillMd',
@@ -105,7 +108,7 @@ function Detail({ skill, api, t, onBack, onChanged }: {
         </p>
       ) : null}
 
-      <div className="smc-detail">
+      <div className={`smc-detail${skill.files.length <= 1 ? ' smc-solo' : ''}`}>
         <div className="smc-tree">
           {skill.files.map(file => (
             <button key={file} aria-current={file === path} onClick={() => setPath(file)}>{file}</button>
@@ -115,13 +118,15 @@ function Detail({ skill, api, t, onBack, onChanged }: {
         <div className="smc-pane">
           <div className="smc-pane-bar">
             <span>{path || '—'}</span>
+            {/* Words, not glyphs: the eye and the copy pictograph had no
+                coverage in the app's font and rendered as nothing at all,
+                leaving two invisible buttons next to a visible one. */}
             <div className="smc-seg">
-              <button aria-selected={!raw} onClick={() => setRaw(false)} title={t('rendered')}>👁</button>
-              <button aria-selected={raw} onClick={() => setRaw(true)} title={t('source')}>&lt;/&gt;</button>
+              <button aria-selected={!raw} onClick={() => setRaw(false)}>{t('rendered')}</button>
+              <button aria-selected={raw} onClick={() => setRaw(true)}>{t('source')}</button>
               <button
-                title={t('copy')}
                 onClick={() => { void navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-              >{copied ? '✓' : '⧉'}</button>
+              >{copied ? t('copied') : t('copy')}</button>
             </div>
           </div>
           {error ? <div className="smc-err" style={{ margin: 12 }}>{error}</div> : <pre className="smc-pre">{body}</pre>}
@@ -137,6 +142,8 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'problems' | 'shadowed'>('all')
+  const [sort, setSort] = useState<'recent' | 'name'>('recent')
+  const [page, setPage] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
   const [busyDir, setBusyDir] = useState('')
   const [flow, setFlow] = useState<'' | 'install' | 'upload' | 'create' | 'ai' | 'directory'>('')
@@ -169,11 +176,21 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
         || row.id.toLowerCase().includes(needle)
         || row.description.toLowerCase().includes(needle)
         || row.origin.includes(needle))
-      // Group by name so the copies of one skill sit together and the
-      // shadowing is visible; within a name, the winning root comes first.
-      .sort((a, b) => a.id.localeCompare(b.id)
-        || Number(Boolean(a.shadowedBy)) - Number(Boolean(b.shadowedBy)))
-  }, [rows, query, filter])
+      // Recent first by default — a freshly installed skill is the one you
+      // came here to look at, and it used to land alphabetically in the
+      // middle of twenty others. Sorting by name instead puts the copies of
+      // one name together, which is how you read a shadowing conflict.
+      .sort((a, b) => sort === 'recent'
+        ? b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
+        : a.id.localeCompare(b.id) || Number(Boolean(a.shadowedBy)) - Number(Boolean(b.shadowedBy)))
+  }, [rows, query, filter, sort])
+
+  // Reset to the first page whenever the result set changes underneath.
+  useEffect(() => { setPage(0) }, [query, filter, sort])
+
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const clamped = Math.min(page, pages - 1)
+  const visible = shown.slice(clamped * PAGE_SIZE, clamped * PAGE_SIZE + PAGE_SIZE)
 
   const current = rows?.find(row => row.dir === open) ?? null
   if (current) {
@@ -240,6 +257,10 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
           <button aria-selected={filter === 'problems'} onClick={() => setFilter('problems')}>{t('filterProblems')} {problems}</button>
           <button aria-selected={filter === 'shadowed'} onClick={() => setFilter('shadowed')}>{t('filterShadowed')} {shadowed}</button>
         </div>
+        <div className="smc-switch">
+          <button aria-selected={sort === 'recent'} onClick={() => setSort('recent')}>{t('sortRecent')}</button>
+          <button aria-selected={sort === 'name'} onClick={() => setSort('name')}>{t('sortName')}</button>
+        </div>
         <button className="smc-btn" onClick={load}>{t('rescan')}</button>
       </div>
 
@@ -252,7 +273,7 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
         </span>
       </div>
 
-      {rows !== null && shown.length === 0
+      {rows !== null && visible.length === 0
         ? <div className="smc-empty">{rows.length === 0 ? t('noSkills') : t('noMatch')}</div>
         : (
           <div style={{ overflowX: 'auto' }}>
@@ -263,7 +284,7 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
                 </tr>
               </thead>
               <tbody>
-                {shown.map(row => (
+                {visible.map(row => (
                   <tr
                     key={row.dir}
                     className={`smc-click${row.shadowedBy || row.state === 'off' ? ' smc-dim' : ''}`}
@@ -292,6 +313,14 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
             </table>
           </div>
         )}
+
+      {pages > 1 ? (
+        <div className="smc-page">
+          <button className="smc-btn" disabled={clamped === 0} onClick={() => setPage(clamped - 1)}>‹</button>
+          <span>{t('pageOf', { page: clamped + 1, pages, total: shown.length })}</span>
+          <button className="smc-btn" disabled={clamped >= pages - 1} onClick={() => setPage(clamped + 1)}>›</button>
+        </div>
+      ) : null}
 
       <div className="smc-legend">
         <span><i className="smc-s-on">{t('stateOn')}</i> {t('legendOn')}</span>

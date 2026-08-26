@@ -134,6 +134,18 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-tok span { font-size: 10.5px; opacity: .5; margin-left: 3px; }
 .smc-tok em { display: block; font-style: normal; font-size: 10.5px; color: var(--smc-ok); margin-top: 1px; }
 
+/* State menu: pick directly instead of cycling. Four states behind one pill
+   meant up to three blind clicks to reach the one you wanted. */
+.smc-state-wrap { position: relative; display: inline-block; }
+.smc-state-menu { position: fixed; z-index: 300; min-width: 260px; max-width: min(340px, calc(100vw - 16px)); padding: 5px;
+  border-radius: 8px; border: 1px solid var(--smc-line-strong); background: var(--smc-bg);
+  color: var(--smc-text); box-shadow: var(--smc-shadow); }
+.smc-state-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  color: inherit; font: inherit; padding: 7px 9px; border-radius: 5px; cursor: pointer; }
+.smc-state-menu button:hover { background: var(--smc-raise); }
+.smc-state-menu button[aria-current="true"] { background: var(--smc-raise); }
+.smc-state-menu i { font-style: normal; font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 600; }
+.smc-state-menu small { display: block; font-size: 11px; opacity: .6; line-height: 1.5; margin-top: 2px; }
 .smc-state { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; font-weight: 500;
   padding: 3px 9px; border-radius: 20px; cursor: pointer; white-space: nowrap; border: 1px solid; background: transparent; }
 .smc-state:disabled { opacity: .5; cursor: default; }
@@ -143,6 +155,7 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-s-user { color: var(--smc-accent); border-color: var(--smc-accent); background: var(--smc-accent-soft); }
 .smc-s-off { opacity: .6; border-color: var(--smc-line-strong); }
 
+.smc-page { display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: .8; }
 .smc-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; opacity: .62; line-height: 1.6; }
 .smc-legend i { font-style: normal; font-family: ui-monospace, monospace; font-weight: 600; margin-right: 4px; }
 
@@ -188,8 +201,13 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-toggle:disabled, .smc-tool-toggle:disabled { opacity: .45; cursor: default; }
 .smc-toggle:focus-visible, .smc-tool-toggle:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 2px; }
 
-.smc-detail { display: grid; grid-template-columns: 210px 1fr; gap: 13px; min-height: 300px; }
-@media (max-width: 680px) { .smc-detail { grid-template-columns: 1fr; } }
+/* The tree only earns a column when there is something to choose between.
+   A single-file skill used to get a 210px sidebar holding one row while the
+   text it was supposed to help you read got squeezed into what was left. */
+.smc-detail { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px; min-height: 300px; }
+.smc-detail.smc-solo { grid-template-columns: minmax(0, 1fr); }
+.smc-detail.smc-solo .smc-tree { display: none; }
+@media (max-width: 720px) { .smc-detail { grid-template-columns: minmax(0, 1fr); } .smc-tree { display: none; } }
 .smc-tree { border: 1px solid var(--smc-line); border-radius: 8px; padding: 8px 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; overflow: auto; max-height: 440px; }
 .smc-tree button { display: block; width: 100%; text-align: left; border: 0; background: transparent;
@@ -205,7 +223,7 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
   border-bottom: 1px solid var(--smc-line); }
 .smc-seg { margin-left: auto; display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px;
   border: 1px solid var(--smc-line); }
-.smc-seg button { border: 0; background: transparent; padding: 2px 7px; border-radius: 4px; cursor: pointer;
+.smc-seg button { border: 0; background: transparent; padding: 3px 9px; font-family: inherit; border-radius: 4px; cursor: pointer;
   color: inherit; font-size: 11.5px; line-height: 1.3; opacity: .6; font-family: ui-monospace, monospace; }
 .smc-seg button[aria-selected="true"] { background: var(--smc-raise); opacity: 1; }
 .smc-seg button:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 1px; }
@@ -297,6 +315,10 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-cm { font-size: 11px; opacity: .55; font-family: ui-monospace, monospace; margin: 3px 0 6px;
   display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
 .smc-ver { border: 1px solid var(--smc-accent); color: var(--smc-accent); padding: 0 5px; border-radius: 3px; font-size: 10px; }
+.smc-link { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; text-align: left; }
+.smc-link:hover { text-decoration: underline; }
+.smc-link:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 2px; border-radius: 3px; }
+a.smc-btn { text-decoration: none; display: inline-block; }
 .smc-topic { cursor: pointer; font-family: inherit; }
 .smc-topic-on { background: var(--smc-accent); border-color: var(--smc-accent); color: var(--smc-on-accent); }
 .smc-topic:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 1px; }
