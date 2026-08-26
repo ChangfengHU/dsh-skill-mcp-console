@@ -81,6 +81,32 @@ still knows the skill exists without paying for the prose. Reverting restores
 the original text verbatim, and every frontmatter edit is backed up into
 `<skill>/.smc-backup/` first.
 
+## The directory
+
+`Browse` reads a JSON index named by `SMC_REGISTRY_URL`. There is no default:
+the Agent Skills format carries no version field, so an index pointing at
+someone else's moving branch hands you a script — holding your machine's
+credentials — that can change under you. Curate your own and pin each entry.
+
+```json
+{
+  "skills": [
+    {
+      "name": "fleet-proxy-switch",
+      "description": "What it does and when it triggers.",
+      "install": "bash <(curl -fsSL 'https://example.com/install-x.sh') agents",
+      "version": "20260825012250"
+    }
+  ]
+}
+```
+
+`install` is run verbatim, so **include whatever argument the script needs**.
+The publisher this was built against prints an interactive menu when called
+with no target — non-interactively that reads EOF, installs nothing, and
+exits 0. The landing checks catch it, but passing the argument is better than
+catching the failure.
+
 ## Development
 
 ```bash
@@ -179,6 +205,29 @@ frontmatter 里写的是别的名字。**打个菜单什么都没装的安装脚
 实现的:把完整描述存进本插件自己的文件,frontmatter 里换成技能名,模型仍然
 知道这个技能存在,但不再为那段长文付费。切回去时原文逐字恢复,而且每次改
 frontmatter 之前都会先备份到 `<技能>/.smc-backup/`。
+
+## 技能目录
+
+`Browse` 读 `SMC_REGISTRY_URL` 指向的 JSON 索引。**没有默认值**:Agent Skills
+格式本身没有版本字段,指向别人的活分支意味着那个脚本——手里握着你机器的凭据
+——随时会在你脚下变。自己收录,每条钉版本。
+
+```json
+{
+  "skills": [
+    {
+      "name": "fleet-proxy-switch",
+      "description": "干什么、什么时候触发。",
+      "install": "bash <(curl -fsSL 'https://example.com/install-x.sh') agents",
+      "version": "20260825012250"
+    }
+  ]
+}
+```
+
+`install` 会被原样执行,所以**脚本要什么参数就得带什么参数**。这套插件对着的
+那个发布器,不给目标参数时会打一个交互菜单——非交互执行下它读到 EOF、什么都
+没装、**退出码还是 0**。落地校验能抓住它,但带上参数比事后抓住更好。
 
 ## 授权
 
