@@ -141,7 +141,7 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   const [busyDir, setBusyDir] = useState('')
   const [flow, setFlow] = useState<'' | 'install' | 'upload' | 'create' | 'ai' | 'directory'>('')
   const [seed, setSeed] = useState('')
-  const [menu, setMenu] = useState(false)
+  const [menu, setMenu] = useState<{ top: number; right: number } | null>(null)
 
   const load = useCallback(() => {
     setError('')
@@ -151,9 +151,12 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   useEffect(load, [load])
   useEffect(() => {
     if (!menu) return
-    const close = () => setMenu(false)
+    const close = () => setMenu(null)
     document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
+    // The settings panel scrolls under a fixed menu, so close rather than
+    // let it drift away from the button it belongs to.
+    window.addEventListener('scroll', close, true)
+    return () => { document.removeEventListener('click', close); window.removeEventListener('scroll', close, true) }
   }, [menu])
 
   const shown = useMemo(() => {
@@ -198,15 +201,31 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
         <div className="smc-spacer" />
         <button className="smc-btn" onClick={() => setFlow('directory')}>{t('browse')}</button>
         <div className="smc-menu">
-          <button className="smc-btn smc-primary" onClick={event => { event.stopPropagation(); setMenu(value => !value) }}>{t('add')} ▾</button>
+          <button
+            className="smc-btn smc-primary"
+            aria-expanded={menu !== null}
+            onClick={event => {
+              event.stopPropagation()
+              if (menu) { setMenu(null); return }
+              // Fixed to the viewport, measured off the button. Positioned
+              // absolutely it was clipped by the settings panel's own
+              // overflow, which cut the left half off every item.
+              const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+              setMenu({ top: rect.bottom + 5, right: Math.max(8, window.innerWidth - rect.right) })
+            }}
+          >{t('add')} ▾</button>
           {menu ? (
-            <div className="smc-menu-list" onClick={event => event.stopPropagation()}>
-              <button onClick={() => { setSeed(''); setFlow('install'); setMenu(false) }}><span className="smc-g">$</span>{t('addCommand')}</button>
-              <button onClick={() => { setFlow('upload'); setMenu(false) }}><span className="smc-g">↑</span>{t('addUpload')}</button>
-              <button onClick={() => { setFlow('create'); setMenu(false) }}><span className="smc-g">✎</span>{t('addCreate')}</button>
-              <button onClick={() => { setFlow('ai'); setMenu(false) }}><span className="smc-g">✳</span>{t('addAi')}</button>
+            <div
+              className="smc-menu-list"
+              style={{ top: menu.top, right: menu.right }}
+              onClick={event => event.stopPropagation()}
+            >
+              <button onClick={() => { setSeed(''); setFlow('install'); setMenu(null) }}><span className="smc-g">$</span>{t('addCommand')}</button>
+              <button onClick={() => { setFlow('upload'); setMenu(null) }}><span className="smc-g">↑</span>{t('addUpload')}</button>
+              <button onClick={() => { setFlow('create'); setMenu(null) }}><span className="smc-g">✎</span>{t('addCreate')}</button>
+              <button onClick={() => { setFlow('ai'); setMenu(null) }}><span className="smc-g">✳</span>{t('addAi')}</button>
               <hr />
-              <button onClick={() => { setFlow('directory'); setMenu(false) }}><span className="smc-g">⌂</span>{t('addDirectory')}</button>
+              <button onClick={() => { setFlow('directory'); setMenu(null) }}><span className="smc-g">⌂</span>{t('addDirectory')}</button>
             </div>
           ) : null}
         </div>

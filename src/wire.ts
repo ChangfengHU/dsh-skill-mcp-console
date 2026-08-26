@@ -48,7 +48,7 @@ export const METHODS = [
   ['skills', 0], ['skillFile', 1], ['setSkillState', 1], ['removeSkill', 1],
   ['mcp', 0], ['mcpJson', 0], ['saveMcpJson', 1], ['setMcpDisabled', 1], ['setToolDisabled', 1],
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
-  ['createSkill', 1], ['uploadSkill', 1], ['directory', 0],
+  ['createSkill', 1], ['uploadSkill', 1], ['directory', 1],
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */
@@ -142,15 +142,18 @@ export interface VerifyCheck {
   detail: string
 }
 
-/** One entry in the skill directory the Browse button opens. */
+/** One third-party skill repository the Browse panel found. */
 export interface DirectoryEntry {
+  /** `owner/repo` on GitHub. */
   name: string
   description: string
+  /** Where it came from, and how popular — rendered as a chip. */
   source: string
+  /** Handed to the install flow verbatim. */
   install: string
-  /** Pinned revision, when the registry declares one. */
+  /** A pinned revision, when the source declares one. GitHub search cannot. */
   version: string | null
   installed: boolean
-  /** Curated by this deployment, or merely visible from an upstream index. */
+  /** Curated by this deployment, rather than found on a public index. */
   curated: boolean
 }

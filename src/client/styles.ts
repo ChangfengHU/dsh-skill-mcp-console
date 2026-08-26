@@ -106,10 +106,12 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-switch button:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 1px; }
 
 .smc-menu { position: relative; }
-.smc-menu-list { color: var(--smc-text); position: absolute; right: 0; top: calc(100% + 5px); z-index: 30; min-width: 224px; padding: 5px;
+/* Fixed, not absolute: the settings panel clips its own overflow, and an
+   absolutely positioned menu lost its left half to that clip. */
+.smc-menu-list { color: var(--smc-text); position: fixed; z-index: 300; min-width: 240px; max-width: min(320px, calc(100vw - 16px)); padding: 5px;
   border-radius: 8px; border: 1px solid var(--smc-line-strong);
   background: var(--smc-bg); box-shadow: var(--smc-shadow); }
-.smc-menu-list button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+.smc-menu-list button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; white-space: nowrap;
   border: 0; background: transparent; font: inherit; font-size: 13px; color: inherit;
   padding: 7px 9px; border-radius: 5px; cursor: pointer; }
 .smc-menu-list button:hover { background: var(--smc-raise); }
@@ -295,6 +297,9 @@ body[data-ds-dark-theme] .smc-root, body[data-ds-dark-theme] .smc-scrim {
 .smc-cm { font-size: 11px; opacity: .55; font-family: ui-monospace, monospace; margin: 3px 0 6px;
   display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
 .smc-ver { border: 1px solid var(--smc-accent); color: var(--smc-accent); padding: 0 5px; border-radius: 3px; font-size: 10px; }
+.smc-topic { cursor: pointer; font-family: inherit; }
+.smc-topic-on { background: var(--smc-accent); border-color: var(--smc-accent); color: var(--smc-on-accent); }
+.smc-topic:focus-visible { outline: 2px solid var(--smc-accent); outline-offset: 1px; }
 .smc-cd { font-size: 12px; opacity: .72; line-height: 1.55;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 

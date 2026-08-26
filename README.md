@@ -81,31 +81,24 @@ still knows the skill exists without paying for the prose. Reverting restores
 the original text verbatim, and every frontmatter edit is backed up into
 `<skill>/.smc-backup/` first.
 
-## The directory
+## Finding skills
 
-`Browse` reads a JSON index named by `SMC_REGISTRY_URL`. There is no default:
-the Agent Skills format carries no version field, so an index pointing at
-someone else's moving branch hands you a script — holding your machine's
-credentials — that can change under you. Curate your own and pin each entry.
+`Find skills` searches GitHub for skill repositories — `agent-skills` alone
+carries five figures of them. Picking one hands its URL to the install flow,
+which downloads it, lists the skills inside and lets you choose: a repository
+is rarely one skill, and installing all of it because it was one card is how
+you end up with twenty you did not ask for.
 
-```json
-{
-  "skills": [
-    {
-      "name": "fleet-proxy-switch",
-      "description": "What it does and when it triggers.",
-      "install": "bash <(curl -fsSL 'https://example.com/install-x.sh') agents",
-      "version": "20260825012250"
-    }
-  ]
-}
-```
+It searches, it does not curate. What comes back is third-party code that
+will hold your machine's credentials — the install flow shows what it
+downloaded and checks what landed, but read the `SKILL.md` before you trust
+one. Unauthenticated search is rate-limited to a few queries a minute;
+`SMC_GITHUB_TOKEN` lifts that.
 
-`install` is run verbatim, so **include whatever argument the script needs**.
-The publisher this was built against prints an interactive menu when called
-with no target — non-interactively that reads EOF, installs nothing, and
-exits 0. The landing checks catch it, but passing the argument is better than
-catching the failure.
+There is deliberately no built-in index of "our" skills. An index that
+enumerates a deployment's internal tooling on a public URL turns *public but
+unlisted* into *here is the list*, and the entries are already installed
+anyway — Browse is for finding what you do not have.
 
 ## Development
 
@@ -206,28 +199,20 @@ frontmatter 里写的是别的名字。**打个菜单什么都没装的安装脚
 知道这个技能存在,但不再为那段长文付费。切回去时原文逐字恢复,而且每次改
 frontmatter 之前都会先备份到 `<技能>/.smc-backup/`。
 
-## 技能目录
+## 怎么找技能
 
-`Browse` 读 `SMC_REGISTRY_URL` 指向的 JSON 索引。**没有默认值**:Agent Skills
-格式本身没有版本字段,指向别人的活分支意味着那个脚本——手里握着你机器的凭据
-——随时会在你脚下变。自己收录,每条钉版本。
+`找技能` 在 GitHub 上搜技能仓库 —— 光 `agent-skills` 这一个话题就有五位数
+的仓库。选中一个会把它的地址交给安装流程:下载下来、列出里面的技能、让你
+挑。**一个仓库很少只有一个技能**,因为它显示成一张卡就整个装下去,结果就是
+多出二十个你没要的。
 
-```json
-{
-  "skills": [
-    {
-      "name": "fleet-proxy-switch",
-      "description": "干什么、什么时候触发。",
-      "install": "bash <(curl -fsSL 'https://example.com/install-x.sh') agents",
-      "version": "20260825012250"
-    }
-  ]
-}
-```
+它只负责搜,不负责背书。搜出来的是第三方代码,而技能是会拿到你机器凭据的
+脚本 —— 安装流程会给你看下载了什么、并校验落地情况,但**信任它之前先读
+`SKILL.md`**。未认证的搜索每分钟只有几次配额,`SMC_GITHUB_TOKEN` 可以放开。
 
-`install` 会被原样执行,所以**脚本要什么参数就得带什么参数**。这套插件对着的
-那个发布器,不给目标参数时会打一个交互菜单——非交互执行下它读到 EOF、什么都
-没装、**退出码还是 0**。落地校验能抓住它,但带上参数比事后抓住更好。
+**故意不内置"我们自己的"技能索引。** 把一个部署的内部工具枚举在公网地址上,
+等于把"公开但不可枚举"变成"这是清单";何况那些本来就已经装好了 ——
+Browse 是用来找你没有的东西的。
 
 ## 授权
 

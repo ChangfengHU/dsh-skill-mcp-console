@@ -63,7 +63,8 @@ export async function apply(ctx: any): Promise<void> {
       call<{ dir: string; checks: VerifyCheck[] }>('createSkill', { name: name_, description, instructions }),
     uploadSkill: (filename: string, base64: string) =>
       call<{ dir: string; checks: VerifyCheck[] }>('uploadSkill', { filename, base64 }),
-    directory: () => call<{ registry: string; entries: DirectoryEntry[]; error: string | null }>('directory'),
+    directory: (query: string, topic: string) =>
+      call<{ topics: string[]; topic: string; entries: DirectoryEntry[]; error: string | null }>('directory', { query, topic }),
   }
 
   const skillsApi: SkillsApi = {
@@ -72,7 +73,7 @@ export async function apply(ctx: any): Promise<void> {
     skillFile: async (dir, path) => (await call<{ text: string }>('skillFile', { dir, path })).text,
     setSkillState: async (dir, state: SkillState) => { await call('setSkillState', { dir, state }) },
     removeSkill: async dir => (await call<{ trash: string }>('removeSkill', { dir })).trash,
-    insertPrompt: text => insertIntoComposer(text),
+    insertPrompt: text => startNewSessionWith(text),
   }
 
   const mcpApi: McpApi = {
@@ -103,23 +104,51 @@ export async function apply(ctx: any): Promise<void> {
 }
 
 /**
- * Drop text into the chat composer.
+ * Open a new session and put the prompt in its composer.
  *
- * There is no published seam for this, so it goes through the DOM: find the
- * composer textarea, set its value the way React will notice, and fire the
- * events a controlled input listens for. It degrades to `false` rather than
- * throwing, and the caller falls back to the clipboard — a prompt on the
- * clipboard is a small inconvenience, a thrown error in a settings panel is
- * not.
+ * There is no published seam for this, so it walks the same path a person
+ * would: close Settings, start a session, then fill the composer. Setting a
+ * React-controlled input needs the native value setter — assigning `.value`
+ * updates the DOM and leaves React's state behind, so the first keystroke
+ * would wipe it.
+ *
+ * It stops short of sending. The prompt is an opening move, and the agent is
+ * about to ask questions; submitting on the user's behalf takes away the
+ * chance to add what it should already know.
+ *
+ * Returns false when any step is missing, and the caller falls back to the
+ * clipboard — a prompt on the clipboard is a small inconvenience, a thrown
+ * error inside a settings panel is not.
  */
-function insertIntoComposer(text: string): boolean {
+function startNewSessionWith(text: string): boolean {
+  const click = (predicate: (el: HTMLElement) => boolean): boolean => {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('button,[role=button]'))) {
+      if (predicate(el)) { el.click(); return true }
+    }
+    return false
+  }
+  const label = (el: HTMLElement) => `${el.getAttribute('aria-label') ?? ''} ${el.innerText ?? ''}`.trim()
+
   try {
-    const field = document.querySelector<HTMLTextAreaElement>('textarea[placeholder], textarea')
-    if (!field) return false
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
-    setter?.call(field, text)
-    field.dispatchEvent(new Event('input', { bubbles: true }))
-    field.focus()
+    // Close whatever dialog we are inside, so the composer is reachable.
+    // The close control labels itself by text in some builds and by
+    // aria-label in others, so both are checked.
+    click(el => /^(close|关闭|×|✕)$/i.test(label(el).trim()))
+
+    window.setTimeout(() => {
+      // Prefer the workspace-scoped button; the generic one is the fallback.
+      if (!click(el => /new session in/i.test(label(el)))) click(el => /new session|新会话|新建会话/i.test(label(el)))
+
+      window.setTimeout(() => {
+        const field = Array.from(document.querySelectorAll<HTMLTextAreaElement>('textarea'))
+          .find(el => el.offsetParent !== null && !el.closest('.smc-root') && !el.closest('.smc-modal'))
+        if (!field) return
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(field, text)
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+        field.focus()
+      }, 600)
+    }, 250)
     return true
   } catch {
     return false

@@ -55,17 +55,8 @@ function patchFile(home: string, profile = 'web'): string {
   return join(home, '.dsh', 'profiles', profile, 'cordis.patch.yml')
 }
 
-/**
- * Where the panel looks for its curated skill index.
- *
- * There is no default. The open Agent Skills format carries no version
- * field, so an index that links straight at someone else's moving branch
- * hands you a skill — a script holding your machine's credentials — that can
- * change under you. Every deployment points this at an index it curates and
- * pins itself, and until then the panel says so instead of reporting
- * somebody's 404 as a failure.
- */
-const DEFAULT_REGISTRY = process.env.SMC_REGISTRY_URL ?? ''
+/** GitHub topics the Agent Skills format actually collects under. */
+const SKILL_TOPICS = ['agent-skills', 'claude-skills', 'claude-skill', 'agent-skill', 'skill-md']
 
 /** Read-and-write service for both panels. */
 export class SkillMcpConsoleService extends TypertRemoteService {
@@ -330,45 +321,69 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   }
 
   /**
-   * The curated skill index the Browse button opens.
+   * Third-party skills, searched on GitHub.
    *
-   * A deployment points `SMC_REGISTRY_URL` at its own index. There is no
-   * built-in upstream marketplace: the open Agent Skills format carries no
-   * version field, so an index that links straight at someone else's HEAD
-   * hands you a skill that can change under you — and a skill is a script
-   * with your machine's credentials. Curated entries pin a revision.
+   * Browse is for finding skills you do not have, which means somebody
+   * else's. An earlier version pointed it at a hand-curated index of this
+   * deployment's own published skills — that is backwards twice over: those
+   * are already installed, and enumerating internal tooling on a public URL
+   * turns "public but unlisted" into "here is the list".
+   *
+   * GitHub is where the format actually lives: `agent-skills` alone carries
+   * five figures of repositories. Results feed straight into the install
+   * flow, which stages the repository, lists the skills inside it and lets
+   * you pick — a repository is rarely one skill.
+   *
+   * Unauthenticated search is rate-limited to a handful of queries a minute;
+   * `SMC_GITHUB_TOKEN` lifts that for anyone who hits it.
    */
-  async directory(): Promise<string> {
+  async directory(payload: string): Promise<string> {
+    const { query, topic } = JSON.parse(payload || '{}') as { query?: string; topic?: string }
     const installed = new Set((await this.scan()).map(skill => skill.id))
-    let entries: DirectoryEntry[] = []
-    let error: string | null = null
-    if (!DEFAULT_REGISTRY) return JSON.stringify({ registry: '', entries, error: null })
-    try {
-      const response = await fetch(DEFAULT_REGISTRY, { redirect: 'follow' })
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
-      const raw = (await response.json()) as { skills?: DirectoryEntry[] } | DirectoryEntry[]
-      const list = Array.isArray(raw) ? raw : raw.skills ?? []
-      entries = list.map(entry => ({
-        name: String(entry.name ?? ''),
-        description: String(entry.description ?? ''),
-        source: String(entry.source ?? DEFAULT_REGISTRY),
-        install: String(entry.install ?? ''),
-        version: entry.version ?? null,
-        installed: installed.has(String(entry.name ?? '')),
-        curated: entry.curated ?? true,
-      })).filter(entry => entry.name)
-    } catch (cause) {
-      error = `${DEFAULT_REGISTRY}: ${(cause as Error).message}`
+    const chosenTopic = topic && SKILL_TOPICS.includes(topic) ? topic : SKILL_TOPICS[0]
+    const search = [`topic:${chosenTopic}`, (query ?? '').trim()].filter(Boolean).join(' ')
+    const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(search)}&sort=stars&order=desc&per_page=30`
+
+    const headers: Record<string, string> = {
+      accept: 'application/vnd.github+json',
+      // GitHub rejects requests with no user agent outright.
+      'user-agent': 'dsh-skill-mcp-console',
     }
-    return JSON.stringify({ registry: DEFAULT_REGISTRY, entries, error })
+    if (process.env.SMC_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.SMC_GITHUB_TOKEN}`
+
+    try {
+      const response = await fetch(url, { headers })
+      if (!response.ok) {
+        const hint = response.status === 403 ? ' (rate limit — set SMC_GITHUB_TOKEN)' : ''
+        throw new Error(`${response.status} ${response.statusText}${hint}`)
+      }
+      const body = (await response.json()) as { items?: GithubRepo[] }
+      const entries: DirectoryEntry[] = (body.items ?? []).map(repo => ({
+        name: repo.full_name,
+        description: repo.description ?? '',
+        source: `★ ${repo.stargazers_count ?? 0}`,
+        install: repo.html_url,
+        // GitHub gives a moving default branch; the install flow pins the
+        // commit it actually downloaded, which is where a version can honestly
+        // come from. Claiming one here would be inventing it.
+        version: null,
+        installed: installed.has(repo.name),
+        curated: false,
+      }))
+      return JSON.stringify({ topics: SKILL_TOPICS, topic: chosenTopic, entries, error: null })
+    } catch (cause) {
+      return JSON.stringify({ topics: SKILL_TOPICS, topic: chosenTopic, entries: [], error: (cause as Error).message })
+    }
   }
 }
 
-/** The fiber's phase as a word, or null while it is simply healthy. */
-function phaseOf(fiber: { state: unknown } | undefined): string | null {
-  if (fiber === undefined) return null
-  const phase = FIBER_PHASE[String(fiber.state)] ?? String(fiber.state)
-  return phase === 'active' ? null : phase
+/** What GitHub search returns, of the fields this uses. */
+interface GithubRepo {
+  full_name: string
+  name: string
+  html_url: string
+  description: string | null
+  stargazers_count: number
 }
 
 /** Where the server lives, as one display string, with credentials removed. */

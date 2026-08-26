@@ -21,7 +21,7 @@ export interface InstallApi {
   runInstall: (token: string, chosen: string[]) => Promise<{ code: number; log: string; installed: string[]; checks: { dir: string; checks: VerifyCheck[] }[] }>
   createSkill: (name: string, description: string, instructions: string) => Promise<{ dir: string; checks: VerifyCheck[] }>
   uploadSkill: (filename: string, base64: string) => Promise<{ dir: string; checks: VerifyCheck[] }>
-  directory: () => Promise<{ registry: string; entries: DirectoryEntry[]; error: string | null }>
+  directory: (query: string, topic: string) => Promise<{ topics: string[]; topic: string; entries: DirectoryEntry[]; error: string | null }>
 }
 
 /** Install from a pasted repository address or command. */
@@ -253,21 +253,27 @@ export function CreateFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T;
   )
 }
 
-/** Hand the job to the agent instead of showing a form. */
+/**
+ * Hand the job to the agent instead of showing a form.
+ *
+ * Starting the session closes this dialog and Settings with it — the point is
+ * to end up in a conversation, and leaving a modal on top of the composer the
+ * prompt just landed in would defeat that.
+ */
 export function AiFlow({ t, onClose, onInsert }: { t: T; onClose: () => void; onInsert: (text: string) => boolean }) {
-  const [done, setDone] = useState(false)
+  const [copied, setCopied] = useState(false)
   const prompt = t('aiPrompt')
   return (
     <Modal title={t('aiTitle')} lead={t('aiLead')} onClose={onClose}>
       <div className="smc-composer"><p>{prompt}</p></div>
-      {done ? <div className="smc-hint" style={{ marginTop: 10 }}>{t('aiInserted')}</div> : null}
+      {copied ? <div className="smc-hint" style={{ marginTop: 10 }}>{t('aiInserted')}</div> : null}
       <div className="smc-foot">
         <button className="smc-btn" onClick={onClose}>{t('cancel')}</button>
         <button
           className="smc-btn smc-primary"
           onClick={() => {
-            if (!onInsert(prompt)) void navigator.clipboard?.writeText(prompt)
-            setDone(true)
+            onClose()
+            if (!onInsert(prompt)) { void navigator.clipboard?.writeText(prompt); setCopied(true) }
           }}
         >{t('aiInsert')}</button>
       </div>
@@ -275,41 +281,71 @@ export function AiFlow({ t, onClose, onInsert }: { t: T; onClose: () => void; on
   )
 }
 
-/** The curated index the Browse button opens. */
+/**
+ * Browse: third-party skills on GitHub.
+ *
+ * Picking one hands its repository URL to the install flow, which downloads
+ * it, lists the skills inside and lets you choose — a repository is rarely
+ * one skill, and installing all of it because it was one card is how you end
+ * up with twenty skills you did not ask for.
+ */
 export function DirectoryFlow({ api, t, onClose, onInstall }: {
   api: InstallApi; t: T; onClose: () => void; onInstall: (install: string) => void
 }) {
   const [state, setState] = useState<Awaited<ReturnType<InstallApi['directory']>> | null>(null)
   const [query, setQuery] = useState('')
-  const load = useCallback(() => { api.directory().then(setState).catch(() => setState({ registry: '', entries: [], error: 'unreachable' })) }, [api])
-  useEffect(load, [load])
+  const [topic, setTopic] = useState('agent-skills')
+  const [busy, setBusy] = useState(false)
 
-  const shown = (state?.entries ?? []).filter(entry =>
-    !query.trim() || entry.name.includes(query.trim()) || entry.description.includes(query.trim()))
+  const load = useCallback((nextQuery: string, nextTopic: string) => {
+    setBusy(true)
+    api.directory(nextQuery, nextTopic)
+      .then(setState)
+      .catch((cause: Error) => setState({ topics: [], topic: nextTopic, entries: [], error: cause.message }))
+      .finally(() => setBusy(false))
+  }, [api])
+
+  useEffect(() => { load('', 'agent-skills') }, [load])
 
   return (
     <Modal title={t('directoryTitle')} lead={t('directoryLead')} onClose={onClose} wide>
-      <input className="smc-input" placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
+      <form
+        className="smc-bar"
+        onSubmit={event => { event.preventDefault(); load(query, topic) }}
+      >
+        <input
+          className="smc-input"
+          placeholder={t('searchRepos')}
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+        />
+        <button className="smc-btn smc-primary" type="submit" disabled={busy}>{t('searchGo')}</button>
+      </form>
+
+      <div className="smc-bar">
+        {(state?.topics ?? ['agent-skills']).map(name => (
+          <button
+            key={name}
+            className={`smc-chip smc-topic${name === topic ? ' smc-topic-on' : ''}`}
+            onClick={() => { setTopic(name); load(query, name) }}
+          >{name}</button>
+        ))}
+      </div>
+
       {state?.error ? <div className="smc-err">{t('registryError', { error: state.error })}</div> : null}
-      {state && !state.registry ? (
-        // No index configured is the normal starting state, not a failure —
-        // saying so beats reporting somebody's 404 as if something broke.
-        <div className="smc-empty">
-          <div>{t('registryUnset')}</div>
-          <div className="smc-hint" style={{ marginTop: 8 }}>{t('registryHint')}</div>
-        </div>
-      ) : null}
-      {state?.registry && !state.error && shown.length === 0 ? <div className="smc-empty">{t('registryEmpty')}</div> : null}
+      {busy ? <div className="smc-empty">…</div> : null}
+      {state && !state.error && !busy && state.entries.length === 0
+        ? <div className="smc-empty">{t('registryEmpty')}</div> : null}
+
       <div className="smc-cards">
-        {shown.map(entry => (
+        {(state?.entries ?? []).map(entry => (
           <div className="smc-card2" key={entry.name}>
             <div className="smc-card-top">
-              <span className="smc-cn">/{entry.name}</span>
+              <span className="smc-cn">{entry.name}</span>
               <button
                 className={`smc-act${entry.installed ? ' smc-act-on' : ''}`}
                 aria-label={entry.installed ? t('installed') : t('install')}
-                disabled={entry.installed}
-                onClick={() => { onInstall(entry.install || entry.source); onClose() }}
+                onClick={() => { onInstall(entry.install); onClose() }}
               >{entry.installed ? '✓' : '＋'}</button>
             </div>
             <div className="smc-cm">
@@ -320,6 +356,8 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
           </div>
         ))}
       </div>
+
+      <p className="smc-hint">{t('directoryNote')}</p>
       <div className="smc-foot"><button className="smc-btn" onClick={onClose}>{t('cancel')}</button></div>
     </Modal>
   )
