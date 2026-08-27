@@ -110,6 +110,10 @@ export const en = {
   selectAll: 'All',
   selectNone: 'None',
   selected: '{n} selected',
+  installedInto: 'Installed {n} skill(s): {path}',
+  checksPassed: 'all landing checks passed',
+  checksFailed: '{n} landing check(s) failed — open the skill to see which',
+  dismiss: 'Dismiss',
 
   uploadTitle: 'Upload a skill',
   uploadLead: 'A .md file needs name and description in its YAML frontmatter; a .zip or .tgz needs a SKILL.md inside.',
@@ -245,6 +249,10 @@ export const zh: Record<ConsoleLocaleKey, string> = {
   selectAll: '全选',
   selectNone: '全不选',
   selected: '已选 {n} 个',
+  installedInto: '已装 {n} 个技能:{path}',
+  checksPassed: '落地校验全过',
+  checksFailed: '{n} 条落地校验没过——点进技能看是哪条',
+  dismiss: '知道了',
 
   uploadTitle: '上传技能包',
   uploadLead: '.md 文件的 YAML frontmatter 必须有 name 和 description;.zip / .tgz 包里必须有 SKILL.md。',

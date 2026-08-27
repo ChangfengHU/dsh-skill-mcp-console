@@ -24,6 +24,16 @@ import { join } from 'node:path'
 import { parseFrontmatter } from './skills.ts'
 import type { InstallCandidate, InstallPlan, VerifyCheck } from './wire.ts'
 
+/**
+ * A directory name this plugin is willing to create under a skill root.
+ *
+ * The guard exists because the empty string is a valid-looking name that
+ * resolves to the root itself. Everything else here is ordinary hygiene.
+ */
+export function isSafeSkillName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) && name !== '.' && name !== '..'
+}
+
 /** How long any one install step may run. */
 const STEP_TIMEOUT_MS = 180_000
 /** Cap on a fetched script or archive. */
@@ -133,7 +143,7 @@ function parseRepo(text: string): RepoRef | null {
  * two-level walk. The recursion stops at the first `SKILL.md` on a branch,
  * so the extra depth costs nothing on a flat repository.
  */
-export async function findSkills(root: string, depth = 4, limit = 300): Promise<InstallCandidate[]> {
+export async function findSkills(root: string, depth = 4, limit = 300, repoName = ''): Promise<InstallCandidate[]> {
   const found: InstallCandidate[] = []
   const walk = async (dir: string, rel: string, left: number): Promise<void> => {
     if (found.length >= limit) return
@@ -145,7 +155,14 @@ export async function findSkills(root: string, depth = 4, limit = 300): Promise<
     }
     if (entries.some(entry => entry.isFile() && entry.name === 'SKILL.md')) {
       const front = parseFrontmatter(await readFile(join(dir, 'SKILL.md'), 'utf8').catch(() => ''))
-      found.push({ path: rel || '.', name: front.name || (rel.split('/').pop() ?? 'skill'), description: front.description })
+      // A skill at the repository root has no directory name to fall back on,
+      // and a SKILL.md that names itself with `displayName` instead of `name`
+      // parses to nothing. Both used to yield an empty name, and an empty name
+      // makes `join(target, name)` the skill root itself — the install would
+      // empty a repository over every skill on the machine.
+      const name = front.name || rel.split('/').filter(Boolean).pop() || repoName || ''
+      if (!isSafeSkillName(name)) return
+      found.push({ path: rel || '.', name, description: front.description })
       return
     }
     if (left <= 0) return
@@ -181,7 +198,9 @@ export async function stage(plan: InstallPlan): Promise<{ dir: string; candidate
     log += result.out
     if (result.code !== 0) throw new Error(`tar exited ${result.code}\n${result.out}`)
     const base = plan.sub ? join(extract, plan.sub) : extract
-    return { dir, candidates: await findSkills(base), log }
+    // A root-level SKILL.md borrows the repository's own name.
+    const repoName = (plan.sub || plan.source).split('/').pop() ?? ''
+    return { dir, candidates: await findSkills(base, 4, 300, repoName.replace(/\.(skill|git)$/i, '')), log }
   }
 
   if (plan.kind === 'git') {
@@ -190,7 +209,7 @@ export async function stage(plan: InstallPlan): Promise<{ dir: string; candidate
     const result = await run('git', ['clone', '--depth', '1', plan.source, extract])
     log += result.out
     if (result.code !== 0) throw new Error(`git exited ${result.code}\n${result.out}`)
-    return { dir, candidates: await findSkills(extract), log }
+    return { dir, candidates: await findSkills(extract, 4, 300, (plan.source.split('/').pop() ?? '').replace(/\.git$/i, '')), log }
   }
 
   if (plan.kind === 'archive') {
@@ -242,6 +261,7 @@ export async function place(stageDir: string, chosen: InstallCandidate[], target
   let log = ''
   await mkdir(target, { recursive: true })
   for (const candidate of chosen) {
+    if (!isSafeSkillName(candidate.name)) throw new Error(`refusing to install under the name ${JSON.stringify(candidate.name)}`)
     const from = candidate.path === '.' ? join(stageDir, 'src') : join(stageDir, 'src', candidate.path)
     const to = join(target, candidate.name)
     await rm(to, { recursive: true, force: true })

@@ -13,6 +13,13 @@ import { useCallback, useEffect, useState } from 'react'
 import type { DirectoryEntry, InstallCandidate, InstallPlan, VerifyCheck } from '../wire.ts'
 import { LogBox, Modal, VerifyList, type T } from './ui.tsx'
 
+/** What an install hands back to the list once it is finished. */
+export interface InstallOutcome {
+  installed: string[]
+  checks: { dir: string; checks: VerifyCheck[] }[]
+  failed: VerifyCheck['key'][]
+}
+
 /** Host calls the Add flows need. */
 export interface InstallApi {
   detectInstall: (input: string) => Promise<InstallPlan>
@@ -27,7 +34,12 @@ export interface InstallApi {
 
 /** Install from a pasted repository address or command. */
 export function InstallFlow({ api, t, onClose, onDone, seed }: {
-  api: InstallApi; t: T; onClose: () => void; onDone: () => void; seed?: string
+  api: InstallApi
+  t: T
+  onClose: () => void
+  /** Hand the finished result to the list and leave. */
+  onDone: (result?: InstallOutcome) => void
+  seed?: string
 }) {
   const [input, setInput] = useState(seed ?? '')
   const [plan, setPlan] = useState<InstallPlan | null>(null)
@@ -78,8 +90,17 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
   const doRun = async (useToken = token, picks = chosen) => {
     setBusy(true); setError('')
     try {
-      setResult(await api.runInstall(useToken, picks))
-      onDone()
+      const outcome = await api.runInstall(useToken, picks)
+      // Installing is the whole errand. Leaving the dialog open with a live
+      // "Run and verify" button invited a second click on a staging token the
+      // first run had already consumed, which is the only way anyone ever saw
+      // "staging expired". The result travels back to the list instead.
+      onDone({
+        installed: outcome.installed,
+        checks: outcome.checks,
+        failed: outcome.checks.flatMap(entry => entry.checks.filter(check => !check.ok).map(check => check.key)),
+      })
+      onClose()
     } catch (cause) {
       setError((cause as Error).message)
     } finally { setBusy(false) }
@@ -183,7 +204,7 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
 }
 
 /** Upload a `.md`, `.zip` or `.tgz`. */
-export function UploadFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T; onClose: () => void; onDone: () => void }) {
+export function UploadFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T; onClose: () => void; onDone: (result?: InstallOutcome) => void }) {
   const [checks, setChecks] = useState<VerifyCheck[] | null>(null)
   const [dir, setDir] = useState('')
   const [error, setError] = useState('')
@@ -222,7 +243,7 @@ export function UploadFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T;
 }
 
 /** Write a skill from three fields. */
-export function CreateFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T; onClose: () => void; onDone: () => void }) {
+export function CreateFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T; onClose: () => void; onDone: (result?: InstallOutcome) => void }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [instructions, setInstructions] = useState('')

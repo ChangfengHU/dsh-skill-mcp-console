@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SkillRow, SkillState } from '../wire.ts'
-import { AiFlow, CreateFlow, DirectoryFlow, InstallFlow, UploadFlow, type InstallApi } from './AddFlows.tsx'
+import { AiFlow, CreateFlow, DirectoryFlow, InstallFlow, UploadFlow, type InstallApi, type InstallOutcome } from './AddFlows.tsx'
 import type { ConsoleLocaleKey } from './locales.ts'
 import { StatePill, VerifyList, fill, tok, when, type T } from './ui.tsx'
 
@@ -99,7 +99,7 @@ function Detail({ skill, api, t, onBack, onChanged }: {
       </div>
 
       {skill.shadowedBy ? <div className="smc-warnbox">{fill(t('shadowedNote'), { root: skill.shadowedBy })}</div> : null}
-      {skill.problem ? <div className="smc-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable')}</div> : null}
+      {skill.problem ? <div className="smc-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable', { n: skill.description.length })}</div> : null}
       {!skill.native ? <div className="smc-hint">{t('nonNative')}</div> : null}
       {skill.description ? <p className="smc-lede">{skill.description}</p> : null}
 
@@ -144,13 +144,15 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   const [flow, setFlow] = useState<'' | 'install' | 'upload' | 'create' | 'ai' | 'directory'>('')
   const [seed, setSeed] = useState('')
   const [menu, setMenu] = useState<{ top: number; right: number } | null>(null)
+  const [outcome, setOutcome] = useState<InstallOutcome | null>(null)
 
-  const load = useCallback(() => {
+  const load = useCallback((result?: InstallOutcome) => {
     setError('')
+    if (result) setOutcome(result)
     api.skills().then(setRows).catch((cause: Error) => setError(cause.message))
   }, [api])
 
-  useEffect(load, [load])
+  useEffect(() => { load() }, [load])
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -244,6 +246,15 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
       </div>
 
       {error ? <div className="smc-err">{error}</div> : null}
+      {outcome ? (
+        // The dialog is gone by now, so the landing checks report here or
+        // nowhere. A failed check is the whole reason they run.
+        <div className={outcome.failed.length ? 'smc-warnbox' : 'smc-okbox'}>
+          {t('installedInto', { n: outcome.installed.length, path: outcome.installed.join(', ') })}
+          {outcome.failed.length ? ` · ${t('checksFailed', { n: outcome.failed.length })}` : ` · ${t('checksPassed')}`}
+          <button className="smc-btn smc-tiny" onClick={() => setOutcome(null)}>{t('dismiss')}</button>
+        </div>
+      ) : null}
 
       <div className="smc-bar">
         <input className="smc-input" placeholder={t('search')} aria-label={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
@@ -292,7 +303,7 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
                       </div>
                       {row.description ? <div className="smc-desc">{row.description}</div> : null}
                       {row.shadowedBy ? <div className="smc-problem">{fill(t('shadowedNote'), { root: row.shadowedBy })}</div> : null}
-                      {row.problem ? <div className="smc-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable')}</div> : null}
+                      {row.problem ? <div className="smc-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable', { n: row.description.length })}</div> : null}
                     </td>
                     <td><StatePill state={row.state} t={t} busy={busyDir === row.dir} onChange={next => changeState(row, next)} /></td>
                     {/* A shadowed copy is never loaded, so it costs nothing.

@@ -15,7 +15,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
-import { detect, findSkills, verify } from '../src/install.ts'
+import { detect, findSkills, isSafeSkillName, verify } from '../src/install.ts'
 import { fromUniversal, phaseOf, toUniversal } from '../src/mcpconfig.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
@@ -313,7 +313,31 @@ describe('verify', () => {
   })
 })
 
+describe('isSafeSkillName', () => {
+  it('refuses the empty name that resolves to the skill root itself', () => {
+    // join(target, '') is target. An install under an empty name emptied a
+    // repository over every skill on the machine instead of into a directory
+    // of its own, and nothing in the flow would have said so.
+    assert.equal(isSafeSkillName(''), false)
+    assert.equal(isSafeSkillName('.'), false)
+    assert.equal(isSafeSkillName('..'), false)
+    assert.equal(isSafeSkillName('../escape'), false)
+    assert.equal(isSafeSkillName('get-job'), true)
+  })
+})
+
 describe('findSkills', () => {
+  it('names a root-level skill after its repository when the frontmatter cannot', async () => {
+    // Some published skills sit at the repository root and describe themselves
+    // with `displayName` rather than `name`, so there is neither a frontmatter
+    // name nor a parent directory to borrow one from.
+    const root = await mkdtemp(join(tmpdir(), 'smc-root-'))
+    await writeFile(join(root, 'SKILL.md'), 'displayName: 实习.skill\nsummary: no fences, no name\n', 'utf8')
+    assert.deepEqual((await findSkills(root)).map(c => c.name), [])
+    assert.deepEqual((await findSkills(root, 4, 300, 'get-job')).map(c => c.name), ['get-job'])
+    await rm(root, { recursive: true, force: true })
+  })
+
   it('finds skills nested a plugin deep', async () => {
     // <plugin>/skills/<name>/SKILL.md is a common repository shape. A
     // two-level walk came back empty from one with sixty-eight skills in it,

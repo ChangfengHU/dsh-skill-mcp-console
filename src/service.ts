@@ -263,6 +263,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     let log = ''
     let code = 0
     let installed: string[] = []
+    let settled = false
 
     try {
       if (entry.plan.kind === 'shell') {
@@ -284,10 +285,16 @@ export class SkillMcpConsoleService extends TypertRemoteService {
 
       const names = (await this.scan(true)).map(skill => skill.id)
       const checks = await Promise.all(installed.map(async dir => ({ dir, checks: await verify(dir, names) })))
+      settled = true
       return JSON.stringify({ code, log, installed, checks })
     } finally {
-      await cleanup(entry.dir)
-      this.staged.delete(token)
+      // Only a finished run retires its staging. Dropping the token on a
+      // failure meant the retry reported "staging expired" instead of the
+      // thing that actually went wrong.
+      if (settled) {
+        await cleanup(entry.dir)
+        this.staged.delete(token)
+      }
     }
   }
 
