@@ -14,7 +14,7 @@
  * deliberate, declared capability: the command is fetched and shown before
  * anything executes, never after.
  *
- * @module dsh-plugin-station/install
+ * @module dsh-skill-mcp/install
  */
 
 import { spawn } from 'node:child_process'
@@ -183,7 +183,7 @@ export async function findSkills(root: string, depth = 4, limit = 300, repoName 
  * installing the wrong thing.
  */
 export async function stage(plan: InstallPlan): Promise<{ dir: string; candidates: InstallCandidate[]; log: string }> {
-  const dir = await mkdtemp(join(tmpdir(), 'dps-install-'))
+  const dir = await mkdtemp(join(tmpdir(), 'dsm-install-'))
   let log = ''
 
   if (plan.kind === 'github') {
@@ -348,7 +348,7 @@ export async function createSkill(target: string, name: string, description: str
 export async function uploadSkill(target: string, filename: string, base64: string): Promise<string> {
   const buffer = Buffer.from(base64, 'base64')
   if (buffer.byteLength > MAX_FETCH_BYTES) throw new Error('file too large')
-  const dir = await mkdtemp(join(tmpdir(), 'dps-upload-'))
+  const dir = await mkdtemp(join(tmpdir(), 'dsm-upload-'))
   try {
     if (/\.md$/i.test(filename)) {
       const text = buffer.toString('utf8')

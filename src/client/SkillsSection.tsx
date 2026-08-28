@@ -7,7 +7,7 @@
  * apart where nobody connects them. A shadowed row is dimmed, badged, and
  * says which root beat it.
  *
- * @module dsh-plugin-station/client/SkillsSection
+ * @module dsh-skill-mcp/client/SkillsSection
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -68,14 +68,14 @@ function Detail({ skill, api, t, onBack, onChanged }: {
   }, [text, raw])
 
   return (
-    <div className="dps-root">
-      <button className="dps-back" onClick={onBack}>‹ {t('back')}</button>
-      <div className="dps-head">
+    <div className="dsm-root">
+      <button className="dsm-back" onClick={onBack}>‹ {t('back')}</button>
+      <div className="dsm-head">
         <div>
-          <h3 className="dps-name">/{skill.id}</h3>
-          <div className="dps-mono">{skill.root}/{skill.id} · {skill.origin} · {when(skill.updatedAt)}</div>
+          <h3 className="dsm-name">/{skill.id}</h3>
+          <div className="dsm-mono">{skill.root}/{skill.id} · {skill.origin} · {when(skill.updatedAt)}</div>
         </div>
-        <div className="dps-spacer" />
+        <div className="dsm-spacer" />
         <StatePill
           state={skill.state}
           t={t}
@@ -86,7 +86,7 @@ function Detail({ skill, api, t, onBack, onChanged }: {
           }}
         />
         <button
-          className="dps-btn"
+          className="dsm-btn"
           disabled={busy}
           onClick={() => {
             setBusy(true)
@@ -98,25 +98,25 @@ function Detail({ skill, api, t, onBack, onChanged }: {
         >{t('remove')}</button>
       </div>
 
-      {skill.shadowedBy ? <div className="dps-warnbox">{fill(t('shadowedNote'), { root: skill.shadowedBy })}</div> : null}
-      {skill.problem ? <div className="dps-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable', { n: skill.description.length })}</div> : null}
-      {!skill.native ? <div className="dps-hint">{t('nonNative')}</div> : null}
-      {skill.description ? <p className="dps-lede">{skill.description}</p> : null}
+      {skill.shadowedBy ? <div className="dsm-warnbox">{fill(t('shadowedNote'), { root: skill.shadowedBy })}</div> : null}
+      {skill.problem ? <div className="dsm-warnbox">{t(PROBLEM[skill.problem] ?? 'problemUnreadable', { n: skill.description.length })}</div> : null}
+      {!skill.native ? <div className="dsm-hint">{t('nonNative')}</div> : null}
+      {skill.description ? <p className="dsm-lede">{skill.description}</p> : null}
 
-      <div className={`dps-detail${skill.files.length <= 1 ? ' dps-solo' : ''}`}>
-        <div className="dps-tree">
+      <div className={`dsm-detail${skill.files.length <= 1 ? ' dsm-solo' : ''}`}>
+        <div className="dsm-tree">
           {skill.files.map(file => (
             <button key={file} aria-current={file === path} onClick={() => setPath(file)}>{file}</button>
           ))}
-          {skill.files.length === 0 ? <div className="dps-hint" style={{ padding: 8 }}>{t('emptyDir')}</div> : null}
+          {skill.files.length === 0 ? <div className="dsm-hint" style={{ padding: 8 }}>{t('emptyDir')}</div> : null}
         </div>
-        <div className="dps-pane">
-          <div className="dps-pane-bar">
+        <div className="dsm-pane">
+          <div className="dsm-pane-bar">
             <span>{path || '—'}</span>
             {/* Words, not glyphs: the eye and the copy pictograph had no
                 coverage in the app's font and rendered as nothing at all,
                 leaving two invisible buttons next to a visible one. */}
-            <div className="dps-seg">
+            <div className="dsm-seg">
               <button aria-selected={!raw} onClick={() => setRaw(false)}>{t('rendered')}</button>
               <button aria-selected={raw} onClick={() => setRaw(true)}>{t('source')}</button>
               <button
@@ -124,7 +124,7 @@ function Detail({ skill, api, t, onBack, onChanged }: {
               >{copied ? t('copied') : t('copy')}</button>
             </div>
           </div>
-          {error ? <div className="dps-err" style={{ margin: 12 }}>{error}</div> : <pre className="dps-pre">{body}</pre>}
+          {error ? <div className="dsm-err" style={{ margin: 12 }}>{error}</div> : <pre className="dsm-pre">{body}</pre>}
         </div>
       </div>
     </div>
@@ -206,17 +206,17 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
   }
 
   return (
-    <div className="dps-root">
-      <div className="dps-head">
+    <div className="dsm-root">
+      <div className="dsm-head">
         <div>
           <h3>{t('skillsTitle')}</h3>
           <p>{t('skillsLead')}</p>
         </div>
-        <div className="dps-spacer" />
-        <button className="dps-btn" onClick={() => setFlow('directory')}>{t('browse')}</button>
-        <div className="dps-menu">
+        <div className="dsm-spacer" />
+        <button className="dsm-btn" onClick={() => setFlow('directory')}>{t('browse')}</button>
+        <div className="dsm-menu">
           <button
-            className="dps-btn dps-primary"
+            className="dsm-btn dsm-primary"
             aria-expanded={menu !== null}
             onClick={event => {
               event.stopPropagation()
@@ -230,59 +230,59 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
           >{t('add')} ▾</button>
           {menu ? (
             <div
-              className="dps-menu-list"
+              className="dsm-menu-list"
               style={{ top: menu.top, right: menu.right }}
               onClick={event => event.stopPropagation()}
             >
-              <button onClick={() => { setSeed(''); setFlow('install'); setMenu(null) }}><span className="dps-g">$</span>{t('addCommand')}</button>
-              <button onClick={() => { setFlow('upload'); setMenu(null) }}><span className="dps-g">↑</span>{t('addUpload')}</button>
-              <button onClick={() => { setFlow('create'); setMenu(null) }}><span className="dps-g">✎</span>{t('addCreate')}</button>
-              <button onClick={() => { setFlow('ai'); setMenu(null) }}><span className="dps-g">✳</span>{t('addAi')}</button>
+              <button onClick={() => { setSeed(''); setFlow('install'); setMenu(null) }}><span className="dsm-g">$</span>{t('addCommand')}</button>
+              <button onClick={() => { setFlow('upload'); setMenu(null) }}><span className="dsm-g">↑</span>{t('addUpload')}</button>
+              <button onClick={() => { setFlow('create'); setMenu(null) }}><span className="dsm-g">✎</span>{t('addCreate')}</button>
+              <button onClick={() => { setFlow('ai'); setMenu(null) }}><span className="dsm-g">✳</span>{t('addAi')}</button>
               <hr />
-              <button onClick={() => { setFlow('directory'); setMenu(null) }}><span className="dps-g">⌂</span>{t('addDirectory')}</button>
+              <button onClick={() => { setFlow('directory'); setMenu(null) }}><span className="dsm-g">⌂</span>{t('addDirectory')}</button>
             </div>
           ) : null}
         </div>
       </div>
 
-      {error ? <div className="dps-err">{error}</div> : null}
+      {error ? <div className="dsm-err">{error}</div> : null}
       {outcome ? (
         // The dialog is gone by now, so the landing checks report here or
         // nowhere. A failed check is the whole reason they run.
-        <div className={outcome.failed.length ? 'dps-warnbox' : 'dps-okbox'}>
+        <div className={outcome.failed.length ? 'dsm-warnbox' : 'dsm-okbox'}>
           {t('installedInto', { n: outcome.installed.length, path: outcome.installed.join(', ') })}
           {outcome.failed.length ? ` · ${t('checksFailed', { n: outcome.failed.length })}` : ` · ${t('checksPassed')}`}
-          <button className="dps-btn dps-tiny" onClick={() => setOutcome(null)}>{t('dismiss')}</button>
+          <button className="dsm-btn dsm-tiny" onClick={() => setOutcome(null)}>{t('dismiss')}</button>
         </div>
       ) : null}
 
-      <div className="dps-bar">
-        <input className="dps-input" placeholder={t('search')} aria-label={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
-        <div className="dps-switch">
+      <div className="dsm-bar">
+        <input className="dsm-input" placeholder={t('search')} aria-label={t('search')} value={query} onChange={event => setQuery(event.target.value)} />
+        <div className="dsm-switch">
           <button aria-selected={filter === 'all'} onClick={() => setFilter('all')}>{t('filterAll')}</button>
           <button aria-selected={filter === 'problems'} onClick={() => setFilter('problems')}>{t('filterProblems')} {problems}</button>
           <button aria-selected={filter === 'shadowed'} onClick={() => setFilter('shadowed')}>{t('filterShadowed')} {shadowed}</button>
         </div>
-        <div className="dps-switch">
+        <div className="dsm-switch">
           <button aria-selected={sort === 'recent'} onClick={() => setSort('recent')}>{t('sortRecent')}</button>
           <button aria-selected={sort === 'name'} onClick={() => setSort('name')}>{t('sortName')}</button>
         </div>
-        <button className="dps-btn" onClick={load}>{t('rescan')}</button>
+        <button className="dsm-btn" onClick={load}>{t('rescan')}</button>
       </div>
 
-      <div className="dps-bar">
+      <div className="dsm-bar">
         <span>{rows === null ? '…' : <><b>{rows.length}</b> {t('countSkills')}</>}</span>
-        <span className="dps-budget">
-          <span className="dps-bl">{t('resident')} {t('approx')}</span>
+        <span className="dsm-budget">
+          <span className="dsm-bl">{t('resident')} {t('approx')}</span>
           <b>{tok(resident)}</b> tok
         </span>
       </div>
 
       {rows !== null && visible.length === 0
-        ? <div className="dps-empty">{rows.length === 0 ? t('noSkills') : t('noMatch')}</div>
+        ? <div className="dsm-empty">{rows.length === 0 ? t('noSkills') : t('noMatch')}</div>
         : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="dps-table">
+            <table className="dsm-table">
               <thead>
                 <tr>
                   <th>{t('colSkill')}</th><th>{t('colState')}</th><th>{t('colCost')}</th><th>{t('colSource')}</th><th>{t('colUpdated')}</th>
@@ -292,28 +292,28 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
                 {visible.map(row => (
                   <tr
                     key={row.dir}
-                    className={`dps-click${row.shadowedBy || row.state === 'off' ? ' dps-dim' : ''}`}
+                    className={`dsm-click${row.shadowedBy || row.state === 'off' ? ' dsm-dim' : ''}`}
                     onClick={() => setOpen(row.dir)}
                   >
                     <td>
-                      <div className="dps-name">
+                      <div className="dsm-name">
                         /{row.id}
-                        {row.shadowedBy ? <span className="dps-chip dps-warn" style={{ marginLeft: 7 }}>{t('filterShadowed')}</span> : null}
-                        {!row.native ? <span className="dps-chip" style={{ marginLeft: 7 }}>bridge</span> : null}
+                        {row.shadowedBy ? <span className="dsm-chip dsm-warn" style={{ marginLeft: 7 }}>{t('filterShadowed')}</span> : null}
+                        {!row.native ? <span className="dsm-chip" style={{ marginLeft: 7 }}>bridge</span> : null}
                       </div>
-                      {row.description ? <div className="dps-desc">{row.description}</div> : null}
-                      {row.shadowedBy ? <div className="dps-problem">{fill(t('shadowedNote'), { root: row.shadowedBy })}</div> : null}
-                      {row.problem ? <div className="dps-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable', { n: row.description.length })}</div> : null}
+                      {row.description ? <div className="dsm-desc">{row.description}</div> : null}
+                      {row.shadowedBy ? <div className="dsm-problem">{fill(t('shadowedNote'), { root: row.shadowedBy })}</div> : null}
+                      {row.problem ? <div className="dsm-problem">{t(PROBLEM[row.problem] ?? 'problemUnreadable', { n: row.description.length })}</div> : null}
                     </td>
                     <td><StatePill state={row.state} t={t} busy={busyDir === row.dir} onChange={next => changeState(row, next)} /></td>
                     {/* A shadowed copy is never loaded, so it costs nothing.
                         Printing its description's price next to the Shadowed
                         badge said two contradictory things at once. */}
-                    <td className="dps-tok">
+                    <td className="dsm-tok">
                       <b>{row.shadowedBy ? 0 : row.tokens}</b><span>tok</span>
                     </td>
-                    <td className="dps-mono">{row.root}</td>
-                    <td className="dps-mono">{when(row.updatedAt)}</td>
+                    <td className="dsm-mono">{row.root}</td>
+                    <td className="dsm-mono">{when(row.updatedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -322,17 +322,17 @@ export function SkillsSection({ api, t }: { api: SkillsApi; t: T }) {
         )}
 
       {pages > 1 ? (
-        <div className="dps-page">
-          <button className="dps-btn" disabled={clamped === 0} onClick={() => setPage(clamped - 1)}>‹</button>
+        <div className="dsm-page">
+          <button className="dsm-btn" disabled={clamped === 0} onClick={() => setPage(clamped - 1)}>‹</button>
           <span>{t('pageOf', { page: clamped + 1, pages, total: shown.length })}</span>
-          <button className="dps-btn" disabled={clamped >= pages - 1} onClick={() => setPage(clamped + 1)}>›</button>
+          <button className="dsm-btn" disabled={clamped >= pages - 1} onClick={() => setPage(clamped + 1)}>›</button>
         </div>
       ) : null}
 
-      <div className="dps-legend">
-        <span><i className="dps-s-on">{t('stateOn')}</i> {t('legendOn')}</span>
-        <span><i className="dps-s-user">{t('stateUserOnly')}</i> {t('legendUserOnly')}</span>
-        <span><i className="dps-s-off">{t('stateOff')}</i> {t('legendOff')}</span>
+      <div className="dsm-legend">
+        <span><i className="dsm-s-on">{t('stateOn')}</i> {t('legendOn')}</span>
+        <span><i className="dsm-s-user">{t('stateUserOnly')}</i> {t('legendUserOnly')}</span>
+        <span><i className="dsm-s-off">{t('stateOff')}</i> {t('legendOff')}</span>
       </div>
 
       {flow === 'install' ? <InstallFlow api={api} t={t} seed={seed} onClose={() => setFlow('')} onDone={load} /> : null}

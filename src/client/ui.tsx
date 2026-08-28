@@ -2,7 +2,7 @@
  * Shared presentation pieces for both sections: the modal shell, the
  * four-state pill, the landing-check list, and the small formatters.
  *
- * @module dsh-plugin-station/client/ui
+ * @module dsh-skill-mcp/client/ui
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -41,7 +41,7 @@ export function stateLabel(state: SkillState): ConsoleLocaleKey {
 
 /** CSS modifier for one state. */
 export function stateClass(state: SkillState): string {
-  return state === 'on' ? 'dps-s-on' : state === 'user-only' ? 'dps-s-user' : 'dps-s-off'
+  return state === 'on' ? 'dsm-s-on' : state === 'user-only' ? 'dsm-s-user' : 'dsm-s-off'
 }
 
 /** Dictionary key for one state's one-line explanation. */
@@ -69,10 +69,10 @@ export function StatePill({ state, t, onChange, busy }: { state: SkillState; t: 
   }, [at])
 
   return (
-    <span className="dps-state-wrap">
+    <span className="dsm-state-wrap">
       <button
         type="button"
-        className={`dps-state ${stateClass(state)}`}
+        className={`dsm-state ${stateClass(state)}`}
         disabled={busy}
         aria-haspopup="menu"
         aria-expanded={at !== null}
@@ -85,7 +85,7 @@ export function StatePill({ state, t, onChange, busy }: { state: SkillState; t: 
         }}
       >{busy ? '…' : t(stateLabel(state))}</button>
       {at ? (
-        <div className="dps-state-menu" role="menu" style={{ top: at.top, left: Math.max(8, at.left) }} onClick={event => event.stopPropagation()}>
+        <div className="dsm-state-menu" role="menu" style={{ top: at.top, left: Math.max(8, at.left) }} onClick={event => event.stopPropagation()}>
           {STATES.map(option => (
             <button
               key={option}
@@ -117,14 +117,14 @@ export function Modal({ title, lead, onClose, children, wide }: {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="dps-scrim" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
-      <div className={`dps-modal${wide ? ' dps-wide' : ''}`} role="dialog" aria-label={title}>
-        <div className="dps-modal-head">
+    <div className="dsm-scrim" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
+      <div className={`dsm-modal${wide ? ' dsm-wide' : ''}`} role="dialog" aria-label={title}>
+        <div className="dsm-modal-head">
           <div>
             <h4>{title}</h4>
             {lead ? <p>{lead}</p> : null}
           </div>
-          <button className="dps-x" onClick={onClose} aria-label={title}>✕</button>
+          <button className="dsm-x" onClick={onClose} aria-label={title}>✕</button>
         </div>
         {children}
       </div>
@@ -138,11 +138,11 @@ export function VerifyList({ checks, t }: { checks: VerifyCheck[]; t: T }) {
     skillMd: 'vSkillMd', frontmatter: 'vFrontmatter', executable: 'vExecutable', registry: 'vRegistry',
   }
   return (
-    <div className="dps-verify">
-      <b>{t('verifyTitle')} <span className="dps-vsub">— {t('verifyLead')}</span></b>
+    <div className="dsm-verify">
+      <b>{t('verifyTitle')} <span className="dsm-vsub">— {t('verifyLead')}</span></b>
       {checks.map(check => (
-        <div key={check.key} className={`dps-v ${check.ok ? 'dps-v-ok' : 'dps-v-bad'}`}>
-          <span className="dps-vi">{check.ok ? '✓' : '✗'}</span>
+        <div key={check.key} className={`dsm-v ${check.ok ? 'dsm-v-ok' : 'dsm-v-bad'}`}>
+          <span className="dsm-vi">{check.ok ? '✓' : '✗'}</span>
           <span>{t(label[check.key])}{check.detail ? ` — ${check.detail}` : ''}</span>
         </div>
       ))}
@@ -153,12 +153,12 @@ export function VerifyList({ checks, t }: { checks: VerifyCheck[]; t: T }) {
 /** A bordered log block. */
 export function LogBox({ title, text, badge }: { title: string; text: string; badge?: string }) {
   return (
-    <div className="dps-pane">
-      <div className="dps-pane-bar">
+    <div className="dsm-pane">
+      <div className="dsm-pane-bar">
         <span>{title}</span>
-        {badge ? <span className="dps-chip" style={{ marginLeft: 'auto' }}>{badge}</span> : null}
+        {badge ? <span className="dsm-chip" style={{ marginLeft: 'auto' }}>{badge}</span> : null}
       </div>
-      <pre className="dps-pre">{text}</pre>
+      <pre className="dsm-pre">{text}</pre>
     </div>
   )
 }

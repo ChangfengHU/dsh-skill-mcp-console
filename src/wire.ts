@@ -1,5 +1,5 @@
 /**
- * Wire contract for the `pluginStation` Remote namespace — the invocation
+ * Wire contract for the `skillMcp` Remote namespace — the invocation
  * descriptors shared verbatim by the host TYPERT manifest and the client
  * Remote contribution, so the two faces can never drift.
  *
@@ -9,13 +9,13 @@
  * that one `z.string()` per side instead of a schema per shape, on a surface
  * that is still moving.
  *
- * @module dsh-plugin-station/wire
+ * @module dsh-skill-mcp/wire
  */
 
 import { z } from 'zod'
 
 /** Package id, repeated in every descriptor id and in both Typert faces. */
-export const PKG = 'dsh-plugin-station'
+export const PKG = 'dsh-skill-mcp'
 
 /** One JSON-string parameter. */
 function jsonParam(name: string) {
@@ -32,9 +32,9 @@ const JSON_RESULT = Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Js
 
 function descriptor(method: string, argc: 0 | 1) {
   return Object.freeze({
-    id: `${PKG}#pluginStation/${method}`,
-    service: 'pluginStation',
-    namespace: 'pluginStation',
+    id: `${PKG}#skillMcp/${method}`,
+    service: 'skillMcp',
+    namespace: 'skillMcp',
     method,
     invocation: Object.freeze({ kind: 'direct' }),
     parameters: Object.freeze(argc === 1 ? [jsonParam('payload')] : []),
@@ -49,8 +49,7 @@ export const METHODS = [
   ['mcp', 0], ['mcpJson', 0], ['saveMcpJson', 1], ['setMcpDisabled', 1], ['setToolDisabled', 1],
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
-  ['codePlugins', 0], ['setPluginDisabled', 1], ['removePlugin', 1], ['addPlugin', 1],
-  ['catalog', 1], ['refreshCatalog', 0], ['restartHost', 0], ['pendingRestart', 0],
+  
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */
@@ -118,81 +117,6 @@ export interface McpRow {
   tools: McpTool[]
   /** Sum of the enabled tools' schema cost. */
   tokens: number
-}
-
-/** One installable entry from the catalog the station browses. */
-export interface CatalogEntry {
-  /** Short display name — the last segment of the catalog's own name. */
-  name: string
-  /** The catalog's full name, `owner/repo` or `owner/repo#packages/x`. */
-  full: string
-  /** The repository part, which is what sibling folding groups on. */
-  repo: string
-  owner: string
-  url: string
-  category: string
-  description: string
-  npm: string | null
-  tarball: string | null
-  /** The repository's star count, as published. */
-  stars: number
-  /** Stars divided by sibling count, and zero for an examples/ entry. */
-  adjusted: number
-  /** How many catalog entries share this repository. */
-  siblings: number
-  downloads: number
-  /** ISO date the catalog added it. */
-  added: string
-  /** What `dsh plugin add` should receive. Empty when nothing installable. */
-  spec: string
-  installable: boolean
-  score: number
-  /** Filled in per request: whether the profile declares it. */
-  installed?: boolean
-  /** Whether it is also live in the composition — false until a restart. */
-  active?: boolean
-  /** Locale key stating why this entry is a pick, when it is one. */
-  why?: string
-}
-
-/** One page of catalog results. */
-export interface CatalogPage {
-  entries: CatalogEntry[]
-  total: number
-  page: number
-  pages: number
-  categories: string[]
-  catalogTotal: number
-}
-
-/** One live composition entry, as the code-plugin view reports it. */
-export interface PluginEntryRow {
-  /** The entry id in the composition — what a patch layer addresses. */
-  id: string
-  /** The module specifier the loader resolved, e.g. `dshmarket/client`. */
-  module: string
-  /** Whether a patch layer has switched this entry off. */
-  disabled: boolean
-  /**
-   * The fiber's phase: `active`, `failed`, `loading`, … or null when the
-   * entry has no fiber at all. This is the honest state; `disabled` is only
-   * the intent, and an enabled entry can still be `failed`.
-   */
-  fiber: string | null
-}
-
-/** One installed package, with every composition entry it contributed. */
-export interface PackageRow {
-  name: string
-  version: string | null
-  description: string
-  /** The dependency spec: a range, `github:owner/repo`, a tarball, `link:`. */
-  source: string
-  /** Whether it declares `dsh.bundle` — i.e. it is a plugin, not a dependency. */
-  bundled: boolean
-  /** Whether it ships a browser half. */
-  hasClient: boolean
-  entries: PluginEntryRow[]
 }
 
 /** What an install string was recognised as. */

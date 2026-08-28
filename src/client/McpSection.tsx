@@ -9,7 +9,7 @@
  * still want in every request" is a question you can only answer with the
  * number in front of you.
  *
- * @module dsh-plugin-station/client/McpSection
+ * @module dsh-skill-mcp/client/McpSection
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -31,23 +31,23 @@ function ServerCard({ row, api, t, onChanged }: { row: McpRow; api: McpApi; t: T
   const [busy, setBusy] = useState('')
 
   return (
-    <div className={`dps-card${row.disabled ? ' dps-card-off' : ''}`}>
-      <div className="dps-row">
+    <div className={`dsm-card${row.disabled ? ' dsm-card-off' : ''}`}>
+      <div className="dsm-row">
         <button
-          className="dps-caret"
+          className="dsm-caret"
           aria-expanded={open}
           aria-label={row.name}
           onClick={() => setOpen(value => !value)}
         >{open ? '▼' : '▶'}</button>
-        <div className="dps-grow">
-          <div className="dps-name">{row.name}</div>
-          <div className="dps-mono dps-trunc">{row.transport}{row.target ? ` · ${row.target}` : ''}</div>
+        <div className="dsm-grow">
+          <div className="dsm-name">{row.name}</div>
+          <div className="dsm-mono dsm-trunc">{row.transport}{row.target ? ` · ${row.target}` : ''}</div>
         </div>
-        <span className="dps-chip">{tok(row.tokens)} tok</span>
-        <span className={`dps-chip ${row.tools.length ? 'dps-ok' : 'dps-warn'}`}>{row.tools.length} {t('tools')}</span>
-        {row.fiber ? <span className={`dps-chip ${row.fiber === 'failed' ? 'dps-warn' : ''}`}>{row.fiber}</span> : null}
+        <span className="dsm-chip">{tok(row.tokens)} tok</span>
+        <span className={`dsm-chip ${row.tools.length ? 'dsm-ok' : 'dsm-warn'}`}>{row.tools.length} {t('tools')}</span>
+        {row.fiber ? <span className={`dsm-chip ${row.fiber === 'failed' ? 'dsm-warn' : ''}`}>{row.fiber}</span> : null}
         <button
-          className="dps-toggle"
+          className="dsm-toggle"
           aria-pressed={!row.disabled}
           aria-label={row.name}
           disabled={busy === 'server' || !row.entryId}
@@ -58,16 +58,16 @@ function ServerCard({ row, api, t, onChanged }: { row: McpRow; api: McpApi; t: T
         />
       </div>
       {open ? (
-        <div className="dps-tools">
+        <div className="dsm-tools">
           {row.tools.length === 0
-            ? <div className="dps-tool"><span>{t('noTools')}</span></div>
+            ? <div className="dsm-tool"><span>{t('noTools')}</span></div>
             : row.tools.map(tool => (
-              <div className={`dps-tool${tool.disabled ? ' dps-dim' : ''}`} key={tool.name}>
+              <div className={`dsm-tool${tool.disabled ? ' dsm-dim' : ''}`} key={tool.name}>
                 <code>mcp__{row.name}__{tool.name}</code>
-                <span className="dps-trunc">{tool.description}</span>
-                <span className="dps-ttok">{tool.tokens} tok</span>
+                <span className="dsm-trunc">{tool.description}</span>
+                <span className="dsm-ttok">{tool.tokens} tok</span>
                 <button
-                  className="dps-tool-toggle"
+                  className="dsm-tool-toggle"
                   aria-pressed={!tool.disabled}
                   aria-label={tool.name}
                   disabled={busy === tool.name}
@@ -122,47 +122,47 @@ export function McpSection({ api, t }: { api: McpApi; t: T }) {
   const resident = rows?.filter(row => !row.disabled).reduce((total, row) => total + row.tokens, 0) ?? 0
 
   return (
-    <div className="dps-root">
-      <div className="dps-head">
+    <div className="dsm-root">
+      <div className="dsm-head">
         <div>
           <h3>{t('mcpTitle')}</h3>
           <p>{t('mcpLead')}</p>
         </div>
-        <div className="dps-spacer" />
-        <div className="dps-switch" role="tablist">
+        <div className="dsm-spacer" />
+        <div className="dsm-switch" role="tablist">
           <button role="tab" aria-selected={view === 'list'} onClick={() => setView('list')}>{t('list')}</button>
           <button role="tab" aria-selected={view === 'json'} onClick={() => setView('json')}>{t('json')}</button>
         </div>
       </div>
 
-      {error ? <div className="dps-err">{error}</div> : null}
-      {notice ? <div className="dps-okbox">{notice}<br />{t('restartNote')}</div> : null}
+      {error ? <div className="dsm-err">{error}</div> : null}
+      {notice ? <div className="dsm-okbox">{notice}<br />{t('restartNote')}</div> : null}
 
       {view === 'list' ? (
         <>
-          <div className="dps-bar">
+          <div className="dsm-bar">
             <span>{rows === null ? '…' : <><b>{rows.length}</b> {t('servers')} · <b>{toolCount}</b> {t('tools')}</>}</span>
-            <span className="dps-budget">
-              <span className="dps-bl">{t('resident')} {t('approx')}</span><b>{tok(resident)}</b> tok
+            <span className="dsm-budget">
+              <span className="dsm-bl">{t('resident')} {t('approx')}</span><b>{tok(resident)}</b> tok
             </span>
-            <span className="dps-spacer" />
-            <button className="dps-btn" onClick={load}>{t('refresh')}</button>
+            <span className="dsm-spacer" />
+            <button className="dsm-btn" onClick={load}>{t('refresh')}</button>
           </div>
           {rows !== null && rows.length === 0
-            ? <div className="dps-empty">{t('noServers')}</div>
+            ? <div className="dsm-empty">{t('noServers')}</div>
             : rows?.map(row => <ServerCard key={row.entryId || row.name} row={row} api={api} t={t} onChanged={load} />)}
         </>
       ) : (
         <>
-          <div className="dps-bar"><span>{t('jsonLead')}</span></div>
-          <div className="dps-bar">
-            <span className="dps-chip dps-warn">{t('jsonMasked')}</span>
-            <span className="dps-spacer" />
-            <button className="dps-btn" disabled={busy || draft === json} onClick={() => setDraft(json)}>{t('revert')}</button>
-            <button className="dps-btn dps-primary" disabled={busy || draft === json} onClick={() => void save()}>{t('save')}</button>
+          <div className="dsm-bar"><span>{t('jsonLead')}</span></div>
+          <div className="dsm-bar">
+            <span className="dsm-chip dsm-warn">{t('jsonMasked')}</span>
+            <span className="dsm-spacer" />
+            <button className="dsm-btn" disabled={busy || draft === json} onClick={() => setDraft(json)}>{t('revert')}</button>
+            <button className="dsm-btn dsm-primary" disabled={busy || draft === json} onClick={() => void save()}>{t('save')}</button>
           </div>
           <textarea
-            className="dps-editor"
+            className="dsm-editor"
             spellCheck={false}
             value={draft}
             onChange={event => setDraft(event.target.value)}

@@ -1,5 +1,5 @@
 /**
- * Browser half: mounts the `pluginStation` Remote contribution and
+ * Browser half: mounts the `skillMcp` Remote contribution and
  * registers two TOP-LEVEL Settings sections.
  *
  * `settings.section` is the deliberate choice. The same panels registered
@@ -7,13 +7,11 @@
  * Plugins, which is where the ecosystem's other capability panels live and
  * why people report not finding them.
  *
- * @module dsh-plugin-station/client
+ * @module dsh-skill-mcp/client
  */
 
-import type { CatalogPage, DirectoryEntry, InstallCandidate, InstallPlan, McpRow, PackageRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
+import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
 import { McpSection, type McpApi } from './McpSection.tsx'
-import { MarketSection, type MarketApi } from './MarketSection.tsx'
-import { PluginsSection, type PluginsApi } from './PluginsSection.tsx'
 import { SkillsSection, type SkillsApi } from './SkillsSection.tsx'
 import { en, zh, type ConsoleLocaleKey } from './locales.ts'
 import { CONSOLE_REMOTE, unwrap } from './remote.ts'
@@ -22,17 +20,15 @@ import { fill } from './ui.tsx'
 
 export { SkillsSection } from './SkillsSection.tsx'
 export { McpSection } from './McpSection.tsx'
-export { PluginsSection } from './PluginsSection.tsx'
-export { MarketSection } from './MarketSection.tsx'
 export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
-export const NS = 'settings.pluginStation'
+export const NS = 'settings.skillMcp'
 
 /** Matches the package name, the graph row id, and the bundle id. */
-export const name = 'dsh-plugin-station'
+export const name = 'dsh-skill-mcp'
 
-/** `remote.pluginStation` appears once this plugin mounts its contribution. */
+/** `remote.skillMcp` appears once this plugin mounts its contribution. */
 export const inject = ['slots', 'locale', 'remote']
 
 /**
@@ -41,8 +37,8 @@ export const inject = ['slots', 'locale', 'remote']
  * @param ctx - client root context.
  */
 export async function apply(ctx: any): Promise<void> {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin-station: dictionaries')
-  ctx.effect(() => installStyles(), 'plugin-station: stylesheet')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'skill-mcp: dictionaries')
+  ctx.effect(() => installStyles(), 'skill-mcp: stylesheet')
 
   await ctx.remote.$mount(CONSOLE_REMOTE)
 
@@ -50,7 +46,7 @@ export async function apply(ctx: any): Promise<void> {
   /** Translate, then substitute `{placeholders}`. */
   const t = (key: ConsoleLocaleKey, params?: Record<string, string | number>) => fill(String(bound(key) ?? key), params)
 
-  const remote = () => ctx.get('remote.pluginStation')
+  const remote = () => ctx.get('remote.skillMcp')
   const call = async <T,>(method: string, payload?: unknown): Promise<T> => {
     const service = remote()
     const result = payload === undefined ? await service[method]() : await service[method](JSON.stringify(payload))
@@ -89,49 +85,9 @@ export async function apply(ctx: any): Promise<void> {
     setToolDisabled: async (server, tool, disabled) => { await call('setToolDisabled', { server, tool, disabled }) },
   }
 
-  const pluginsApi: PluginsApi = {
-    codePlugins: () => call<{ installed: PackageRow[]; builtinEntries: number; builtinPackages: number; profile: string }>('codePlugins'),
-    setPluginDisabled: async (entryId, disabled) => { await call('setPluginDisabled', { entryId, disabled }) },
-    removePlugin: name_ => call<{ code: number; log: string }>('removePlugin', { name: name_ }),
-    addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
-    pendingRestart: () => call<{ added: string[]; removed: string[] }>('pendingRestart'),
-    restartHost: () => call<{ restarting: boolean }>('restartHost'),
-  }
-
-  const marketApi: MarketApi = {
-    catalog: q => call<CatalogPage>('catalog', q),
-    refreshCatalog: () => call<{ total: number }>('refreshCatalog'),
-    addPlugin: spec => call<{ code: number; log: string; restartRequired?: boolean }>('addPlugin', { spec }),
-    pendingRestart: () => call<{ added: string[]; removed: string[] }>('pendingRestart'),
-    restartHost: () => call<{ restarting: boolean }>('restartHost'),
-  }
-
-  // The market gets its own tab beside the installed list — browsing and
-  // managing are different jobs, and mixing them is what makes the Host's
-  // own page hard to read.
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'plugin-station-market',
-    order: 31,
-    label: () => t('marketNav'),
-    locale: NS,
-    inject: () => ({ api: marketApi, t }),
-  }, MarketSection))
-
-  // A tab on the Host's own Plugins page, not another top-level entry: code
-  // plugins belong there, and the Host publishes this slot for exactly this.
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'plugin-station-code-plugins',
-    order: 30,
-    label: () => t('codePluginsNav'),
-    locale: NS,
-    inject: () => ({ api: pluginsApi, t }),
-  }, PluginsSection))
-
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'plugin-station-skills',
+    id: 'skill-mcp-skills',
     order: 26,
     label: () => t('skillsNav'),
     locale: NS,
@@ -140,7 +96,7 @@ export async function apply(ctx: any): Promise<void> {
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'plugin-station-mcp',
+    id: 'skill-mcp-mcp',
     order: 27,
     label: () => t('mcpNav'),
     locale: NS,
@@ -186,7 +142,7 @@ function startNewSessionWith(text: string): boolean {
 
       window.setTimeout(() => {
         const field = Array.from(document.querySelectorAll<HTMLTextAreaElement>('textarea'))
-          .find(el => el.offsetParent !== null && !el.closest('.dps-root') && !el.closest('.dps-modal'))
+          .find(el => el.offsetParent !== null && !el.closest('.dsm-root') && !el.closest('.dsm-modal'))
         if (!field) return
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
         setter?.call(field, text)

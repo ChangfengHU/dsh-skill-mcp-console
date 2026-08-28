@@ -1,5 +1,5 @@
 /**
- * `dsh-plugin-station` — Skills and MCP as two top-level Settings sections.
+ * `dsh-skill-mcp` — Skills and MCP as two top-level Settings sections.
  *
  * Why this exists, given how many capability panels the ecosystem already
  * has: every one measured before writing it fails at least one of these, and
@@ -24,37 +24,34 @@
  * Function plugin — no default export (the Loader unwraps
  * `exports.default ?? exports`).
  *
- * @module dsh-plugin-station
+ * @module dsh-skill-mcp
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { PluginStationService } from './service.ts'
+import { SkillMcpService } from './service.ts'
 
-export const name = 'plugin-station'
+export const name = 'skill-mcp'
 
 /** The facts the panels read: composition entries and the tool registry. */
 export const inject = ['tools', 'loader']
 
-export { PluginStationService } from './service.ts'
+export { SkillMcpService } from './service.ts'
 export {
   ROOTS, parseFrontmatter, readSkillFile, removeSkill, rootsFor,
   scanSkills, setSkillState, stateOf, tildify,
 } from './skills.ts'
 export {
   MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, phaseOf, policyPath, readToolPolicy,
-  setDisabled, setEntryDisabled, toUniversal, writeToolPolicy,
+  setDisabled, toUniversal, writeToolPolicy,
 } from './mcpconfig.ts'
 export {
   cleanup, createSkill, detect, findSkills, peek, place, run, runShell, stage,
   uploadSkill, verify,
 } from './install.ts'
-export { collectPackages, packageOf } from './plugins.ts'
-export { CATALOG_URL, PAGE_SIZE, cachePath, loadCatalog, normalize, page, repoOf, specOf } from './catalog.ts'
 export { estimateToolTokens, estimateTokens, formatTokens } from './tokens.ts'
 export { CONSOLE_INVOCATIONS, METHODS, PKG } from './wire.ts'
 export type {
-  CatalogEntry, CatalogPage, DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, PackageRow,
-  PluginEntryRow, SkillRow, SkillState, VerifyCheck,
+  DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, SkillRow, SkillState, VerifyCheck,
 } from './wire.ts'
 export type { Frontmatter } from './skills.ts'
 export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
@@ -65,5 +62,5 @@ export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
  * @param ctx - context carrying the tool registry and the loader.
  */
 export async function apply(ctx: Context): Promise<void> {
-  await ctx.plugin(PluginStationService)
+  await ctx.plugin(SkillMcpService)
 }

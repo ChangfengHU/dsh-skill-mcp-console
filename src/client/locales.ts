@@ -3,7 +3,7 @@
  * accepts. Everything the user reads goes through here — a plugin published
  * for other people cannot ship one language hardcoded into its markup.
  *
- * @module dsh-plugin-station/client/locales
+ * @module dsh-skill-mcp/client/locales
  */
 
 /** Keys this plugin's dictionary defines. */
@@ -11,62 +11,15 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
-  replyLost: "The reply did not come back — installing rewrites the profile and can restart this panel mid-call. The list below is re-read from disk, so it shows what actually happened.",
 
-  removeConfirmRestart: "Removes it from the profile, then restarts dsh — required, because a removed plugin left running takes the whole UI down.",
 
-  restartRemoved: "Uninstalled but still running: {list}. Their menus and settings stay on screen until dsh restarts.",
 
-  tabFeatured: "Picks",
-  tabAll: "All",
-  featuredCount: "{n} picks — short on purpose, and each says why",
-  featuredStation: "Why: the panel you are reading. Skills, MCP, code plugins and this market in one place.",
-  featuredCodex: "Why: makes a local codex CLI a model route, and fixes the reserved-prefix collision that stopped its tool calls working.",
-  featuredSidebar: "Why: the highest-download UI plugin in the catalog, and the one that changes the day-to-day most.",
-  featuredModlens: "Why: gives a text-only model eyes, without a key.",
-  featuredContext: "Why: shows what is eating your context window, which is the thing nothing else tells you.",
 
-  restartPending: "Installed but not running yet: {list}. dsh picks them up on its next start.",
-  restartNow: "Restart now",
-  restarting: "Restarting — this page reloads as soon as dsh answers again.",
 
-  needsRestart: "installed · restart to activate",
-  restartHint: "Installed. It joins the composition on the next dsh restart — nothing changes in the running app until then.",
 
-  marketNav: "Market",
-  marketSearch: "Search the catalog…",
-  allCategories: "All categories",
-  sort_score: "Best match",
-  sort_downloads: "Downloads",
-  sort_stars: "Stars (adjusted)",
-  sort_recent: "Recently added",
   refresh: "Refresh",
-  marketCount: "{shown} shown of {all} in the catalog",
-  foldedNote: "monorepos folded to their best two — search to see every entry",
-  marketEmpty: "Nothing matches. Try another category, or clear the search.",
-  downloads: "downloads",
-  ofSiblings: "1 of {n} in its repo",
-  noSpec: "no installable specifier",
   installed: "installed",
-  prev: "Previous",
-  next: "Next",
 
-  codePluginsNav: "Code plugins",
-  pluginsBlurb: "The packages you installed into this deployment. The Host's own list is one row per composition entry, and most of those entries are the Host itself; this one lists only yours, grouped by package, and reports the fiber phase rather than the toggle's intent.",
-  yourPlugins: "installed",
-  noPlugins: "No third-party packages in this profile.",
-  builtinFolded: "{entries} more entries come from {packages} packages the Host ships. Folded away — you did not install them, and they are rarely yours to change.",
-  entries: "entries",
-  entryOne: "entry",
-  entryId: "Entry id",
-  module: "Module",
-  state: "State",
-  noEntries: "This package registered no composition entries — it may be disabled, or a plain dependency rather than a plugin.",
-  notAPlugin: "not a plugin",
-  hasClient: "browser half",
-  removeConfirm: "Removes it from the profile and recomposes; dsh restarts.",
-  addPluginPlaceholder: "npm name / github:owner/repo / tarball URL",
-  profile: "profile",
   working: "Working…",
 
   skillsNav: 'Skills',
@@ -206,62 +159,15 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
-  replyLost: "应答没回来——安装会改写 profile，可能在调用中途把这个面板重建掉。下面的列表是从磁盘重新读的，以它为准。",
 
-  removeConfirmRestart: "从 profile 移除后会立即重启 dsh——这一步必须做：卸掉的插件如果继续挂在运行中的进程里，整个界面会打不开。",
 
-  restartRemoved: "已卸载但还在跑：{list}。它们的菜单和设置页会一直留在界面上，直到 dsh 重启。",
 
-  tabFeatured: "精选",
-  tabAll: "全部",
-  featuredCount: "{n} 条精选——刻意短，而且每条都说明理由",
-  featuredStation: "理由：你正在用的这个面板。技能、MCP、代码插件和这个市场收在一处。",
-  featuredCodex: "理由：把本机 codex CLI 变成模型路由，并修好了让它一个工具都调不了的保留前缀冲突。",
-  featuredSidebar: "理由：目录里下载量最高的 UI 插件，也是最能改变日常操作的那个。",
-  featuredModlens: "理由：让纯文本模型长出眼睛，而且不用配 key。",
-  featuredContext: "理由：告诉你上下文窗口被什么吃掉了——这件事没有别的东西会告诉你。",
 
-  restartPending: "已装但还没跑起来：{list}。dsh 下次启动时才会加载它们。",
-  restartNow: "立即重启",
-  restarting: "正在重启——dsh 一恢复应答，这个页面就会自动刷新。",
 
-  needsRestart: "已装 · 重启后生效",
-  restartHint: "已安装。它会在 dsh 下次重启时进入组合——在那之前，正在运行的应用里不会有任何变化。",
 
-  marketNav: "插件市场",
-  marketSearch: "搜索目录…",
-  allCategories: "全部分类",
-  sort_score: "综合",
-  sort_downloads: "下载量",
-  sort_stars: "星标（已摊薄）",
-  sort_recent: "最近加入",
   refresh: "刷新目录",
-  marketCount: "目录共 {all} 条，当前筛出 {shown} 条",
-  foldedNote: "同仓库子包已折叠为最好的两条——搜索时显示全部",
-  marketEmpty: "没有匹配的。换个分类，或者清掉搜索词。",
-  downloads: "次下载",
-  ofSiblings: "同仓库 {n} 个之一",
-  noSpec: "没有可安装的来源",
   installed: "已安装",
-  prev: "上一页",
-  next: "下一页",
 
-  codePluginsNav: "代码插件",
-  pluginsBlurb: "这个部署里你自己装的包。dsh 原生的插件列表按组合条目展开，其中绝大多数是 dsh 自己的内部单元；这里只列你装的，按包分组，状态取 fiber 真值而不是开关意图。",
-  yourPlugins: "个你装的包",
-  noPlugins: "这个 profile 里没有第三方包。",
-  builtinFolded: "另有 {entries} 条组合项来自 dsh 自带的 {packages} 个包，已折叠——它们不是你装的，通常也不该动。",
-  entries: "条组合项",
-  entryOne: "条组合项",
-  entryId: "条目 id",
-  module: "模块",
-  state: "状态",
-  noEntries: "这个包没有向组合注册任何条目——可能没启用，也可能它只是个普通依赖。",
-  notAPlugin: "非插件",
-  hasClient: "带前端",
-  removeConfirm: "将从 profile 移除并重新组合，dsh 会重启。",
-  addPluginPlaceholder: "npm 包名 / github:owner/repo / tarball 地址",
-  profile: "profile",
   working: "执行中…",
 
   skillsNav: '技能',
