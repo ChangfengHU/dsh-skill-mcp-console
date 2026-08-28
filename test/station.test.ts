@@ -18,6 +18,7 @@ import { after, before, describe, it } from 'node:test'
 import { detect, findSkills, isSafeSkillName, verify } from '../src/install.ts'
 import { fromUniversal, phaseOf, setEntryDisabled, toUniversal } from '../src/mcpconfig.ts'
 import { collectPackages, packageOf } from '../src/plugins.ts'
+import { normalize, page } from '../src/catalog.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
 
@@ -427,5 +428,57 @@ describe('code plugins', () => {
     text = await readFile(file, 'utf8')
     assert.doesNotMatch(text, /name: c\n\s+disabled: true/)
     await rm(dir, { recursive: true, force: true })
+  })
+})
+
+describe('market catalog', () => {
+  const raw = {
+    plugins: [
+      // A monorepo: 34 entries would share one star count upstream.
+      ...Array.from({ length: 5 }, (_, i) => ({
+        name: `owner/mono#packages/p${i}`, owner: 'owner', url: 'https://github.com/owner/mono',
+        category: 'ui', description: { zh: `子包 ${i}` }, stars: 100, downloads: 10,
+      })),
+      { name: 'solo/one', owner: 'solo', url: 'https://github.com/solo/one', category: 'tools',
+        description: { zh: '单体' }, stars: 40, downloads: 50_000, npm: 'solo-one' },
+      // An examples/ entry inside a famous project borrows nothing.
+      { name: 'famous/proj#examples/demo', owner: 'famous', url: 'https://github.com/famous/proj',
+        category: 'ui', description: { en: 'demo' }, stars: 30_000, downloads: 0 },
+    ],
+  }
+
+  it('divides stars by siblings and zeroes an examples/ entry', () => {
+    const rows = normalize(raw)
+    const mono = rows.find(r => r.full === 'owner/mono#packages/p0')!
+    assert.equal(mono.siblings, 5)
+    assert.equal(mono.stars, 100)
+    assert.equal(mono.adjusted, 20, 'stars are shared across the repo')
+    assert.equal(rows.find(r => r.full === 'famous/proj#examples/demo')!.adjusted, 0)
+    assert.equal(rows.find(r => r.full === 'solo/one')!.adjusted, 40)
+  })
+
+  it('derives the specifier from npm, then from the GitHub URL', () => {
+    const rows = normalize(raw)
+    assert.equal(rows.find(r => r.full === 'solo/one')!.spec, 'solo-one')
+    assert.equal(rows.find(r => r.full === 'owner/mono#packages/p0')!.spec, 'github:owner/mono')
+  })
+
+  it('folds a repo to two entries, and stops folding once you search', () => {
+    const rows = normalize(raw)
+    const folded = page(rows, {}, new Set())
+    assert.equal(folded.entries.filter(r => r.repo === 'owner/mono').length, 2,
+      'one repository cannot own the page')
+    // The examples/ row outranks nothing now that its borrowed stars are gone.
+    assert.equal(folded.entries[0]!.full, 'solo/one')
+
+    const searched = page(rows, { query: '子包' }, new Set())
+    assert.equal(searched.entries.length, 5, 'a search shows every match')
+  })
+
+  it('marks what the profile already has', () => {
+    const rows = normalize(raw)
+    const result = page(rows, {}, new Set(['solo-one']))
+    assert.equal(result.entries.find(r => r.full === 'solo/one')!.installed, true)
+    assert.equal(result.entries.find(r => r.repo === 'owner/mono')!.installed, false)
   })
 })

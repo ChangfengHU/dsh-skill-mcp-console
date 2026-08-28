@@ -49,10 +49,11 @@ export {
   uploadSkill, verify,
 } from './install.ts'
 export { collectPackages, packageOf } from './plugins.ts'
+export { CATALOG_URL, PAGE_SIZE, cachePath, loadCatalog, normalize, page, repoOf, specOf } from './catalog.ts'
 export { estimateToolTokens, estimateTokens, formatTokens } from './tokens.ts'
 export { CONSOLE_INVOCATIONS, METHODS, PKG } from './wire.ts'
 export type {
-  DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, PackageRow,
+  CatalogEntry, CatalogPage, DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, PackageRow,
   PluginEntryRow, SkillRow, SkillState, VerifyCheck,
 } from './wire.ts'
 export type { Frontmatter } from './skills.ts'

@@ -10,8 +10,9 @@
  * @module dsh-plugin-station/client
  */
 
-import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, PackageRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
+import type { CatalogPage, DirectoryEntry, InstallCandidate, InstallPlan, McpRow, PackageRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
 import { McpSection, type McpApi } from './McpSection.tsx'
+import { MarketSection, type MarketApi } from './MarketSection.tsx'
 import { PluginsSection, type PluginsApi } from './PluginsSection.tsx'
 import { SkillsSection, type SkillsApi } from './SkillsSection.tsx'
 import { en, zh, type ConsoleLocaleKey } from './locales.ts'
@@ -22,6 +23,7 @@ import { fill } from './ui.tsx'
 export { SkillsSection } from './SkillsSection.tsx'
 export { McpSection } from './McpSection.tsx'
 export { PluginsSection } from './PluginsSection.tsx'
+export { MarketSection } from './MarketSection.tsx'
 export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
@@ -93,6 +95,24 @@ export async function apply(ctx: any): Promise<void> {
     removePlugin: name_ => call<{ code: number; log: string }>('removePlugin', { name: name_ }),
     addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
   }
+
+  const marketApi: MarketApi = {
+    catalog: q => call<CatalogPage>('catalog', q),
+    refreshCatalog: () => call<{ total: number }>('refreshCatalog'),
+    addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
+  }
+
+  // The market gets its own tab beside the installed list — browsing and
+  // managing are different jobs, and mixing them is what makes the Host's
+  // own page hard to read.
+  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
+    name: 'settings.plugins.tab',
+    id: 'plugin-station-market',
+    order: 31,
+    label: () => t('marketNav'),
+    locale: NS,
+    inject: () => ({ api: marketApi, t }),
+  }, MarketSection))
 
   // A tab on the Host's own Plugins page, not another top-level entry: code
   // plugins belong there, and the Host publishes this slot for exactly this.

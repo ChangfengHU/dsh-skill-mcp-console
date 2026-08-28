@@ -50,6 +50,7 @@ export const METHODS = [
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
   ['codePlugins', 0], ['setPluginDisabled', 1], ['removePlugin', 1], ['addPlugin', 1],
+  ['catalog', 1], ['refreshCatalog', 0],
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */
@@ -117,6 +118,47 @@ export interface McpRow {
   tools: McpTool[]
   /** Sum of the enabled tools' schema cost. */
   tokens: number
+}
+
+/** One installable entry from the catalog the station browses. */
+export interface CatalogEntry {
+  /** Short display name — the last segment of the catalog's own name. */
+  name: string
+  /** The catalog's full name, `owner/repo` or `owner/repo#packages/x`. */
+  full: string
+  /** The repository part, which is what sibling folding groups on. */
+  repo: string
+  owner: string
+  url: string
+  category: string
+  description: string
+  npm: string | null
+  tarball: string | null
+  /** The repository's star count, as published. */
+  stars: number
+  /** Stars divided by sibling count, and zero for an examples/ entry. */
+  adjusted: number
+  /** How many catalog entries share this repository. */
+  siblings: number
+  downloads: number
+  /** ISO date the catalog added it. */
+  added: string
+  /** What `dsh plugin add` should receive. Empty when nothing installable. */
+  spec: string
+  installable: boolean
+  score: number
+  /** Filled in per request: whether this profile already has it. */
+  installed?: boolean
+}
+
+/** One page of catalog results. */
+export interface CatalogPage {
+  entries: CatalogEntry[]
+  total: number
+  page: number
+  pages: number
+  categories: string[]
+  catalogTotal: number
 }
 
 /** One live composition entry, as the code-plugin view reports it. */

@@ -14,7 +14,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { readFile } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -26,6 +26,7 @@ import {
   type UniversalServer,
 } from './mcpconfig.ts'
 import { spawn } from 'node:child_process'
+import { cachePath, loadCatalog, page as catalogPage, type CatalogQuery } from './catalog.ts'
 import { collectPackages } from './plugins.ts'
 import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.ts'
 import { estimateToolTokens } from './tokens.ts'
@@ -490,6 +491,32 @@ export class PluginStationService extends TypertRemoteService {
     const { name } = JSON.parse(payload) as { name: string }
     if (!SAFE_PACKAGE.test(name)) throw new Error(`refusing to remove ${JSON.stringify(name)}`)
     return JSON.stringify(await dshPlugin(['remove', name]))
+  }
+
+  /**
+   * One page of the market.
+   *
+   * The catalog is a couple of megabytes; it is fetched and cached here so
+   * the browser only ever receives the page it is showing. Which packages
+   * are already installed is joined in on the way out, so a card can say
+   * "installed" without the panel making a second round trip.
+   */
+  async catalog(payload: string): Promise<string> {
+    const query = JSON.parse(payload || '{}') as CatalogQuery
+    const rows = await loadCatalog(this.home)
+    const installed = new Set<string>()
+    for (const entry of this.ctx.loader.entries()) {
+      const module = typeof entry.options.name === 'string' ? entry.options.name : ''
+      if (module) installed.add(module.split('/')[0]!.startsWith('@') ? module.split('/').slice(0, 2).join('/') : module.split('/')[0]!)
+    }
+    return JSON.stringify(catalogPage(rows, query, installed))
+  }
+
+  /** Drop the cached catalog so the next read refetches. */
+  async refreshCatalog(): Promise<string> {
+    await rm(cachePath(this.home), { force: true })
+    const rows = await loadCatalog(this.home)
+    return JSON.stringify({ total: rows.length })
   }
 
   /** Install a package into the profile the same way. */
