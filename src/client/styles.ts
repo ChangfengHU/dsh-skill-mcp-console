@@ -339,6 +339,7 @@ a.dps-btn { text-decoration: none; display: inline-block; }
 .dps-state { font-size: 12px; white-space: nowrap; }
 .dps-restart { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px;
   font-size: 12.8px; background: var(--dps-warn-bg); border: 1px solid var(--dps-warn); }
+.dps-why { margin: 0; font-size: 12.3px; line-height: 1.55; color: var(--dps-accent); }
 .dps-select { font: inherit; font-size: 12.5px; padding: 5px 8px; border-radius: 6px; color: inherit;
   background: var(--dps-raise); border: 1px solid var(--dps-line-strong); cursor: pointer; }
 .dps-mkt { gap: 6px; }

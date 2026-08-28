@@ -468,8 +468,10 @@ describe('market catalog', () => {
     const folded = page(rows, {}, new Set())
     assert.equal(folded.entries.filter(r => r.repo === 'owner/mono').length, 2,
       'one repository cannot own the page')
-    // The examples/ row outranks nothing now that its borrowed stars are gone.
-    assert.equal(folded.entries[0]!.full, 'solo/one')
+    // Our own entries are merged in and lead; behind them, the examples/ row
+    // outranks nothing now that its borrowed stars are gone.
+    const community = folded.entries.filter(r => r.owner !== 'ChangfengHU')
+    assert.equal(community[0]!.full, 'solo/one')
 
     const searched = page(rows, { query: '子包' }, new Set())
     assert.equal(searched.entries.length, 5, 'a search shows every match')
@@ -480,5 +482,27 @@ describe('market catalog', () => {
     const result = page(rows, {}, new Set(['solo-one']))
     assert.equal(result.entries.find(r => r.full === 'solo/one')!.installed, true)
     assert.equal(result.entries.find(r => r.repo === 'owner/mono')!.installed, false)
+  })
+
+  it('returns the picks in their listed order, each carrying its reason', () => {
+    const rows = normalize(raw)
+    const picks = page(rows, { featured: true }, new Set())
+    // Only entries the list names, in the order it names them.
+    assert.deepEqual(picks.entries.map(r => r.name), ['dsh-plugin-station', 'dsh-codex-claude-cli'],
+      'a pick the catalog does not carry is still listed; one it names but the fixture lacks is skipped')
+    // A pick with no stated reason is an ad, so every one carries a key.
+    assert.ok(picks.entries.every(r => typeof r.why === 'string' && r.why.length > 0))
+    assert.equal(picks.pages, 1, 'the shortlist never paginates')
+  })
+
+  it('merges our own entries without duplicating an upstream listing', () => {
+    const withUs = normalize({ plugins: [
+      ...raw.plugins,
+      { name: 'ChangfengHU/dsh-plugin-station', owner: 'ChangfengHU',
+        url: 'https://github.com/ChangfengHU/dsh-plugin-station', category: 'market',
+        description: { zh: '上游也收录了' }, stars: 5, downloads: 0 },
+    ] })
+    const picks = page(withUs, { featured: true }, new Set())
+    assert.equal(picks.entries.filter(r => r.name === 'dsh-plugin-station').length, 1)
   })
 })

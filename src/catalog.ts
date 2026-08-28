@@ -37,6 +37,47 @@ export const CATALOG_URL = 'https://awesome-dsh-plugin.com/plugins.json'
 /** How long a cached copy is served before a refetch is attempted. */
 const MAX_AGE_MS = 6 * 60 * 60 * 1000
 
+/**
+ * The picks — entries the station puts in front of everything else.
+ *
+ * A ranking built from stars and downloads answers "what is popular", which
+ * is not the same question as "what should I install". Popularity also lags:
+ * something published last week cannot outrank something published last
+ * year no matter how good it is. So a short, hand-kept list sits above the
+ * ranking, and says out loud why each entry is on it — a pick with no stated
+ * reason is just an ad.
+ *
+ * Kept deliberately short. A featured list long enough to need scrolling has
+ * stopped being a recommendation and become a second catalog.
+ */
+export const FEATURED: { key: string; why: string }[] = [
+  { key: 'dsh-plugin-station', why: 'featuredStation' },
+  { key: 'dsh-codex-claude-cli', why: 'featuredCodex' },
+  { key: 'dsh-better-sidebar', why: 'featuredSidebar' },
+  { key: 'modlens', why: 'featuredModlens' },
+  { key: 'dsh-context', why: 'featuredContext' },
+]
+
+/** Entries the catalog does not carry yet, published as our own picks. */
+export const OWN: CatalogEntry[] = [
+  {
+    name: 'dsh-plugin-station', full: 'ChangfengHU/dsh-plugin-station', repo: 'ChangfengHU/dsh-plugin-station',
+    owner: 'ChangfengHU', url: 'https://github.com/ChangfengHU/dsh-plugin-station',
+    category: 'market',
+    description: '技能、MCP、代码插件与插件市场四合一：影子技能检测、MCP 工具级开关、按包分组的插件管理、装完一键重启生效。',
+    npm: null, tarball: null, stars: 0, adjusted: 0, siblings: 1, downloads: 0, added: '2026-08-27',
+    spec: 'github:ChangfengHU/dsh-plugin-station', installable: true, score: 100,
+  },
+  {
+    name: 'dsh-codex-claude-cli', full: 'ChangfengHU/dsh-codex-claude-cli', repo: 'ChangfengHU/dsh-codex-claude-cli',
+    owner: 'ChangfengHU', url: 'https://github.com/ChangfengHU/dsh-codex-claude-cli',
+    category: 'model',
+    description: '把本机已登录的 codex CLI 当作 Harness 的模型路由；修好了与 Codex 保留前缀冲突的 MCP 工具名,工具调用真能用。',
+    npm: null, tarball: null, stars: 0, adjusted: 0, siblings: 1, downloads: 0, added: '2026-08-27',
+    spec: 'github:ChangfengHU/dsh-codex-claude-cli', installable: true, score: 100,
+  },
+]
+
 /** Entries per page. Enough to fill a screen, small enough to send often. */
 export const PAGE_SIZE = 24
 
@@ -174,6 +215,8 @@ export interface CatalogQuery {
   sort?: 'score' | 'downloads' | 'stars' | 'recent'
   page?: number
   group?: boolean
+  /** Return only the hand-kept picks, ignoring every other filter. */
+  featured?: boolean
 }
 
 /**
@@ -190,7 +233,34 @@ export function page(
   live: Set<string> = declared,
 ): CatalogPage {
   const needle = (query.query ?? '').trim().toLowerCase()
-  let list = rows.filter(row => {
+
+  // Our own entries are not in the community catalog, so they are merged in
+  // rather than looked up. Merging by name keeps a later upstream listing
+  // from producing a duplicate.
+  const known = new Set(rows.map(row => row.name))
+  const all = [...rows, ...OWN.filter(row => !known.has(row.name))]
+
+  if (query.featured) {
+    const byName = new Map(all.map(row => [row.npm ?? row.name, row]))
+    const alsoByName = new Map(all.map(row => [row.name, row]))
+    const picks: CatalogEntry[] = []
+    for (const { key, why } of FEATURED) {
+      const found = byName.get(key) ?? alsoByName.get(key)
+      if (found) picks.push({ ...found, why })
+    }
+    return {
+      entries: picks.map(row => {
+        const key = row.npm ?? row.name
+        const has = declared.has(key) || declared.has(row.name)
+        return { ...row, installed: has, active: has && (live.has(key) || live.has(row.name)) }
+      }),
+      total: picks.length, page: 0, pages: 1,
+      categories: [...new Set(all.map(row => row.category).filter(Boolean))].sort(),
+      catalogTotal: all.length,
+    }
+  }
+
+  let list = all.filter(row => {
     if (query.category && query.category !== 'all' && row.category !== query.category) return false
     if (!needle) return true
     return row.name.toLowerCase().includes(needle)
@@ -226,7 +296,7 @@ export function page(
   const total = list.length
   const pageIndex = Math.max(0, query.page ?? 0)
   const slice = list.slice(pageIndex * PAGE_SIZE, pageIndex * PAGE_SIZE + PAGE_SIZE)
-  const categories = [...new Set(rows.map(row => row.category).filter(Boolean))].sort()
+  const categories = [...new Set(all.map(row => row.category).filter(Boolean))].sort()
 
   return {
     entries: slice.map(row => {
@@ -238,6 +308,6 @@ export function page(
     page: pageIndex,
     pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
     categories,
-    catalogTotal: rows.length,
+    catalogTotal: all.length,
   }
 }

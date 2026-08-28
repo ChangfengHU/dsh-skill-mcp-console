@@ -28,7 +28,7 @@ import { tok, type T } from './ui.tsx'
 
 /** What the market calls back into the host with. */
 export interface MarketApi {
-  catalog: (query: { query?: string; category?: string; sort?: string; page?: number }) => Promise<CatalogPage>
+  catalog: (query: { query?: string; category?: string; sort?: string; page?: number; featured?: boolean }) => Promise<CatalogPage>
   refreshCatalog: () => Promise<{ total: number }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string; restartRequired?: boolean }>
   pendingRestart: () => Promise<{ pending: string[] }>
@@ -74,6 +74,7 @@ function Card({ row, t, onInstall, busy, elapsed }: {
           >{busy === row.full ? `${t("working")} ${elapsed}s` : t("install")}</button>
         )}
       </div>
+      {row.why ? <p className="dps-why">{t(row.why as never)}</p> : null}
       {row.description ? <p className="dps-cd">{row.description}</p> : null}
       <div className="dps-mono dps-trunc dps-dim">{row.spec || t('noSpec')}</div>
     </div>
@@ -94,6 +95,7 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
   const [category, setCategory] = useState('all')
   const [sort, setSort] = useState<string>('score')
   const [pageIndex, setPageIndex] = useState(0)
+  const [featured, setFeatured] = useState(true)
   const [busy, setBusy] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [restartNonce, setRestartNonce] = useState(0)
@@ -104,20 +106,24 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
   const load = useCallback(async (patch: { query?: string; page?: number } = {}) => {
     try {
       const result = await api.catalog({
-        query: patch.query ?? query, category, sort, page: patch.page ?? pageIndex,
+        query: patch.query ?? query, category, sort, page: patch.page ?? pageIndex, featured,
       })
       setData(result)
       setError('')
     } catch (cause) { setError(String(cause)) }
   }, [api, query, category, sort, pageIndex])
 
-  useEffect(() => { void load() }, [category, sort, pageIndex])
+  useEffect(() => { void load() }, [category, sort, pageIndex, featured])
 
   // Typing hits the catalog on every keystroke otherwise, and the catalog is
   // a few thousand rows filtered on the host.
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { setPageIndex(0); void load({ query, page: 0 }) }, 220)
+    debounce.current = setTimeout(() => {
+      // Typing is a request for the whole catalog, not for the shortlist.
+      if (query.trim() !== '') setFeatured(false)
+      setPageIndex(0); void load({ query, page: 0 })
+    }, 220)
     return () => { if (debounce.current) clearTimeout(debounce.current) }
   }, [query])
 
@@ -143,6 +149,10 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
     <div className="dps-root">
       <RestartBar api={api} t={t} nonce={restartNonce} />
       <div className="dps-bar">
+        <div className="dps-switch">
+          <button aria-pressed={featured} onClick={() => { setFeatured(true); setPageIndex(0) }}>{t('tabFeatured')}</button>
+          <button aria-pressed={!featured} onClick={() => { setFeatured(false); setPageIndex(0) }}>{t('tabAll')}</button>
+        </div>
         <input
           className="dps-input dps-grow"
           value={query}
@@ -165,8 +175,10 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
       {data === null ? <p className="dps-hint">{t('loading')}</p> : (
         <>
           <div className="dps-count">
-            {t('marketCount', { shown: data.total, all: data.catalogTotal })}
-            {query.trim() === '' ? <span className="dps-dim"> · {t('foldedNote')}</span> : null}
+            {featured
+              ? t('featuredCount', { n: data.total })
+              : t('marketCount', { shown: data.total, all: data.catalogTotal })}
+            {!featured && query.trim() === '' ? <span className="dps-dim"> · {t('foldedNote')}</span> : null}
           </div>
           {data.entries.map(row => (
             <Card key={row.full} row={row} t={t} busy={busy} elapsed={elapsed} onInstall={install} />

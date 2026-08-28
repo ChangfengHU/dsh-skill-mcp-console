@@ -151,6 +151,8 @@ export interface CatalogEntry {
   installed?: boolean
   /** Whether it is also live in the composition — false until a restart. */
   active?: boolean
+  /** Locale key stating why this entry is a pick, when it is one. */
+  why?: string
 }
 
 /** One page of catalog results. */

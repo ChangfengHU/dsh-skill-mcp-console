@@ -11,6 +11,15 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  tabFeatured: "Picks",
+  tabAll: "All",
+  featuredCount: "{n} picks — short on purpose, and each says why",
+  featuredStation: "Why: the panel you are reading. Skills, MCP, code plugins and this market in one place.",
+  featuredCodex: "Why: makes a local codex CLI a model route, and fixes the reserved-prefix collision that stopped its tool calls working.",
+  featuredSidebar: "Why: the highest-download UI plugin in the catalog, and the one that changes the day-to-day most.",
+  featuredModlens: "Why: gives a text-only model eyes, without a key.",
+  featuredContext: "Why: shows what is eating your context window, which is the thing nothing else tells you.",
+
   restartPending: "Installed but not running yet: {list}. dsh picks them up on its next start.",
   restartNow: "Restart now",
   restarting: "Restarting — this page reloads as soon as dsh answers again.",
@@ -191,6 +200,15 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  tabFeatured: "精选",
+  tabAll: "全部",
+  featuredCount: "{n} 条精选——刻意短，而且每条都说明理由",
+  featuredStation: "理由：你正在用的这个面板。技能、MCP、代码插件和这个市场收在一处。",
+  featuredCodex: "理由：把本机 codex CLI 变成模型路由，并修好了让它一个工具都调不了的保留前缀冲突。",
+  featuredSidebar: "理由：目录里下载量最高的 UI 插件，也是最能改变日常操作的那个。",
+  featuredModlens: "理由：让纯文本模型长出眼睛，而且不用配 key。",
+  featuredContext: "理由：告诉你上下文窗口被什么吃掉了——这件事没有别的东西会告诉你。",
+
   restartPending: "已装但还没跑起来：{list}。dsh 下次启动时才会加载它们。",
   restartNow: "立即重启",
   restarting: "正在重启——dsh 一恢复应答，这个页面就会自动刷新。",
