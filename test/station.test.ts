@@ -532,3 +532,19 @@ describe('restart accounting', () => {
     assert.deepEqual(split(['a', 'b'], ['b', 'a']), { added: [], removed: [] })
   })
 })
+
+describe('restart accounting, second pass', () => {
+  // Built-ins reach the composition under a scheme rather than a package
+  // name, and a profile can never declare or remove one. Counting them as
+  // "removed" made the bar demand a restart over cordis:group on every load.
+  const removed = (declared: string[], live: string[]) =>
+    live.filter(n => !declared.includes(n) && !n.startsWith('@deepseek-ai') && !n.includes(':')).sort()
+
+  it('ignores scheme-style built-ins', () => {
+    assert.deepEqual(removed(['a'], ['a', 'cordis:group', 'cordis:include']), [])
+  })
+
+  it('still catches a genuinely removed package alongside them', () => {
+    assert.deepEqual(removed(['a'], ['a', 'cordis:group', 'gone-pkg']), ['gone-pkg'])
+  })
+})

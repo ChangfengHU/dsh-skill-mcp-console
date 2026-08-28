@@ -124,10 +124,23 @@ function PackageCard({ row, api, t, onChanged, onRemoved }: {
                     // removal has been ordered and the restart is what
                     // makes the result true, so both paths end there.
                     try {
-                      await Promise.race([
-                        api.removePlugin(row.name).catch(() => null),
-                        new Promise(resolve => setTimeout(resolve, 4000)),
-                      ])
+                      void api.removePlugin(row.name).catch(() => null)
+                      // Restarting the moment the call is made kills the
+                      // package manager mid-removal: the profile is already
+                      // rewritten, so the menus go, while node_modules keeps
+                      // the files. So watch the profile instead of the
+                      // clock, and only restart once the package is really
+                      // gone from it.
+                      const gone = async () => {
+                        try {
+                          const now = await api.codePlugins()
+                          return !now.installed.some(p => p.name === row.name)
+                        } catch { return false }
+                      }
+                      const deadline = Date.now() + 90_000
+                      while (Date.now() < deadline && !(await gone())) {
+                        await new Promise(resolve => setTimeout(resolve, 1500))
+                      }
                     } finally {
                       setBusy(''); setConfirming(false); onChanged(); onRemoved()
                     }

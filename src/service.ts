@@ -574,7 +574,14 @@ export class PluginStationService extends TypertRemoteService {
     // on screen, which reads as "the uninstall did nothing".
     return JSON.stringify({
       added: [...declared].filter(name => !live.has(name)).sort(),
-      removed: [...live].filter(name => !declared.has(name) && !name.startsWith('@deepseek-ai')).sort(),
+      // Only things a profile could have declared count as "removed". The
+      // Host's own scope never can, and neither can a built-in whose module
+      // is a scheme rather than a package — `cordis:group`, `cordis:include`
+      // — which is what made the bar demand a restart over entries nobody
+      // installed and nobody can uninstall.
+      removed: [...live]
+        .filter(name => !declared.has(name) && !name.startsWith('@deepseek-ai') && !name.includes(':'))
+        .sort(),
     })
   }
 
