@@ -52,7 +52,8 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test --experimental-strip-types \"test/*.test.ts\""
+    "test": "node --test --experimental-strip-types \"test/*.test.ts\"",
+    "prepare": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
