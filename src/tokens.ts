@@ -14,7 +14,7 @@
  * figure depends on the model's tokenizer — so every surface that shows it
  * says "约" / "approx".
  *
- * @module dsh-skill-mcp-console/tokens
+ * @module dsh-plugin-station/tokens
  */
 
 /** CJK ideographs, kana, Hangul, and full-width punctuation. */

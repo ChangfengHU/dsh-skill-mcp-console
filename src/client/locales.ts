@@ -3,7 +3,7 @@
  * accepts. Everything the user reads goes through here — a plugin published
  * for other people cannot ship one language hardcoded into its markup.
  *
- * @module dsh-skill-mcp-console/client/locales
+ * @module dsh-plugin-station/client/locales
  */
 
 /** Keys this plugin's dictionary defines. */

@@ -127,7 +127,7 @@ describe('rootsFor', () => {
 describe('scanSkills', () => {
   let home = ''
   before(async () => {
-    home = await mkdtemp(join(tmpdir(), 'smc-test-'))
+    home = await mkdtemp(join(tmpdir(), 'dps-test-'))
     const write = async (root: string, name: string, front: string) => {
       await mkdir(join(home, root, name), { recursive: true })
       await writeFile(join(home, root, name, 'SKILL.md'), front, 'utf8')
@@ -173,7 +173,7 @@ describe('setSkillState', () => {
   let home = ''
   let dir = ''
   before(async () => {
-    home = await mkdtemp(join(tmpdir(), 'smc-state-'))
+    home = await mkdtemp(join(tmpdir(), 'dps-state-'))
     dir = join(home, '.agents/skills/toggler')
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, 'SKILL.md'), '---\nname: toggler\ndescription: 原始描述\n---\n\n正文保持不变\n', 'utf8')
@@ -213,7 +213,7 @@ describe('mcpconfig', () => {
           Authorization: Bearer REAL-SECRET
 `
   before(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'smc-yaml-'))
+    dir = await mkdtemp(join(tmpdir(), 'dps-yaml-'))
     file = join(dir, 'cordis.patch.yml')
     await writeFile(file, SOURCE, 'utf8')
   })
@@ -290,7 +290,7 @@ describe('phaseOf', () => {
 describe('verify', () => {
   let dir = ''
   before(async () => {
-    const home = await mkdtemp(join(tmpdir(), 'smc-verify-'))
+    const home = await mkdtemp(join(tmpdir(), 'dps-verify-'))
     dir = join(home, 'my-skill')
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, 'SKILL.md'), '---\nname: other\ndescription: d\n---\nbody', 'utf8')
@@ -331,7 +331,7 @@ describe('findSkills', () => {
     // Some published skills sit at the repository root and describe themselves
     // with `displayName` rather than `name`, so there is neither a frontmatter
     // name nor a parent directory to borrow one from.
-    const root = await mkdtemp(join(tmpdir(), 'smc-root-'))
+    const root = await mkdtemp(join(tmpdir(), 'dps-root-'))
     await writeFile(join(root, 'SKILL.md'), 'displayName: 实习.skill\nsummary: no fences, no name\n', 'utf8')
     assert.deepEqual((await findSkills(root)).map(c => c.name), [])
     assert.deepEqual((await findSkills(root, 4, 300, 'get-job')).map(c => c.name), ['get-job'])
@@ -342,7 +342,7 @@ describe('findSkills', () => {
     // <plugin>/skills/<name>/SKILL.md is a common repository shape. A
     // two-level walk came back empty from one with sixty-eight skills in it,
     // and the dialog said nothing at all.
-    const root = await mkdtemp(join(tmpdir(), 'smc-deep-'))
+    const root = await mkdtemp(join(tmpdir(), 'dps-deep-'))
     await mkdir(join(root, 'pm-execution/skills/create-prd'), { recursive: true })
     await writeFile(join(root, 'pm-execution/skills/create-prd/SKILL.md'), '---\nname: create-prd\ndescription: d\n---\n', 'utf8')
     const found = await findSkills(root)
@@ -352,7 +352,7 @@ describe('findSkills', () => {
   })
 
   it('finds every skill in a repository, not just the first', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'smc-find-'))
+    const root = await mkdtemp(join(tmpdir(), 'dps-find-'))
     for (const name of ['alpha', 'beta']) {
       await mkdir(join(root, name), { recursive: true })
       await writeFile(join(root, name, 'SKILL.md'), `---\nname: ${name}\ndescription: d\n---\n`, 'utf8')

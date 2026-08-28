@@ -6,7 +6,7 @@
  * because the alternative — trusting an exit code — is how an install that
  * printed a menu and copied nothing gets reported as a success.
  *
- * @module dsh-skill-mcp-console/client/AddFlows
+ * @module dsh-plugin-station/client/AddFlows
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -114,48 +114,48 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
 
   return (
     <Modal title={t('installTitle')} lead={t('installLead')} onClose={onClose} wide>
-      <div className="smc-field">
-        <label htmlFor="smc-install-input">{t('installInput')}</label>
+      <div className="dps-field">
+        <label htmlFor="dps-install-input">{t('installInput')}</label>
         <textarea
-          id="smc-install-input"
+          id="dps-install-input"
           rows={2}
           spellCheck={false}
-          className="smc-mono-input"
+          className="dps-mono-input"
           value={input}
           onChange={event => setInput(event.target.value)}
           placeholder="https://github.com/anthropics/skills"
         />
-        <div className="smc-hint">{t('installHint')}</div>
+        <div className="dps-hint">{t('installHint')}</div>
       </div>
 
       {plan ? (
-        <div className="smc-detect">
-          <span className="smc-badge">{t('detected')}</span>
+        <div className="dps-detect">
+          <span className="dps-badge">{t('detected')}</span>
           <span>{plan.label}</span>
-          <span className="smc-spacer" />
-          <span className="smc-mono">{t('installTarget')} ~/.agents/skills/</span>
+          <span className="dps-spacer" />
+          <span className="dps-mono">{t('installTarget')} ~/.agents/skills/</span>
         </div>
       ) : null}
 
       {plan ? (
-        <div className="smc-peek">
-          <button className="smc-peek-sum" onClick={peekScript} aria-expanded={showScript}>
+        <div className="dps-peek">
+          <button className="dps-peek-sum" onClick={peekScript} aria-expanded={showScript}>
             {showScript ? '▾' : '▸'} {t('peekOpen')}
           </button>
-          {showScript ? <pre className="smc-pre">{script || '…'}</pre> : null}
+          {showScript ? <pre className="dps-pre">{script || '…'}</pre> : null}
         </div>
       ) : null}
 
       {candidates.length > 0 ? (
-        <div className="smc-verify">
+        <div className="dps-verify">
           <b>
             {t('found', { n: candidates.length })}
-            <button className="smc-btn smc-tiny" onClick={() => setChosen(candidates.map(c => c.path))}>{t('selectAll')}</button>
-            <button className="smc-btn smc-tiny" onClick={() => setChosen([])}>{t('selectNone')}</button>
-            <span className="smc-vsub"> · {t('selected', { n: chosen.length })}</span>
+            <button className="dps-btn dps-tiny" onClick={() => setChosen(candidates.map(c => c.path))}>{t('selectAll')}</button>
+            <button className="dps-btn dps-tiny" onClick={() => setChosen([])}>{t('selectNone')}</button>
+            <span className="dps-vsub"> · {t('selected', { n: chosen.length })}</span>
           </b>
           {candidates.map(candidate => (
-            <label className="smc-pick" key={candidate.path}>
+            <label className="dps-pick" key={candidate.path}>
               <input
                 type="checkbox"
                 checked={chosen.includes(candidate.path)}
@@ -163,8 +163,8 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
                   ? [...list, candidate.path]
                   : list.filter(item => item !== candidate.path))}
               />
-              <span className="smc-pn">{candidate.name}</span>
-              <span className="smc-pd">{candidate.description}</span>
+              <span className="dps-pn">{candidate.name}</span>
+              <span className="dps-pd">{candidate.description}</span>
             </label>
           ))}
         </div>
@@ -174,16 +174,16 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
 
       {result?.checks.map(entry => (
         <div key={entry.dir}>
-          <div className="smc-hint smc-mono" style={{ marginTop: 8 }}>{entry.dir}</div>
+          <div className="dps-hint dps-mono" style={{ marginTop: 8 }}>{entry.dir}</div>
           <VerifyList checks={entry.checks} t={t} />
         </div>
       ))}
 
-      {error ? <div className="smc-err">{error}</div> : null}
+      {error ? <div className="dps-err">{error}</div> : null}
 
       {/* Folded away. It is reference material you read once, and it was
           taking a third of the dialog on every visit. */}
-      <details className="smc-req">
+      <details className="dps-req">
         <summary>{t('supported')}</summary>
         <ul>
           <li><code>https://github.com/user/repo</code> · <code>user/repo</code> · <code>github:user/repo/skills/foo</code> · <code>…/tree/&lt;branch&gt;/&lt;dir&gt;</code></li>
@@ -193,11 +193,11 @@ export function InstallFlow({ api, t, onClose, onDone, seed }: {
         </ul>
       </details>
 
-      <div className="smc-foot">
-        <button className="smc-btn" onClick={onClose}>{t('cancel')}</button>
+      <div className="dps-foot">
+        <button className="dps-btn" onClick={onClose}>{t('cancel')}</button>
         {candidates.length > 0
-          ? <button className="smc-btn smc-primary" disabled={busy || chosen.length === 0} onClick={() => void doRun()}>{t('runInstall')}</button>
-          : <button className="smc-btn smc-primary" disabled={busy || !plan} onClick={() => void doStage()}>{t('runInstall')}</button>}
+          ? <button className="dps-btn dps-primary" disabled={busy || chosen.length === 0} onClick={() => void doRun()}>{t('runInstall')}</button>
+          : <button className="dps-btn dps-primary" disabled={busy || !plan} onClick={() => void doStage()}>{t('runInstall')}</button>}
       </div>
     </Modal>
   )
@@ -226,18 +226,18 @@ export function UploadFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T;
   return (
     <Modal title={t('uploadTitle')} lead={t('uploadLead')} onClose={onClose}>
       <label
-        className="smc-drop"
+        className="dps-drop"
         onDragOver={event => event.preventDefault()}
         onDrop={event => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) void take(file) }}
       >
-        <span className="smc-big">⊕</span>
+        <span className="dps-big">⊕</span>
         {busy ? '…' : t('drop')}
         <input type="file" accept=".md,.zip,.tgz,.gz" hidden onChange={event => { const file = event.target.files?.[0]; if (file) void take(file) }} />
       </label>
-      {dir ? <div className="smc-hint smc-mono" style={{ marginTop: 10 }}>{dir}</div> : null}
+      {dir ? <div className="dps-hint dps-mono" style={{ marginTop: 10 }}>{dir}</div> : null}
       {checks ? <VerifyList checks={checks} t={t} /> : null}
-      {error ? <div className="smc-err">{error}</div> : null}
-      <div className="smc-foot"><button className="smc-btn" onClick={onClose}>{t('cancel')}</button></div>
+      {error ? <div className="dps-err">{error}</div> : null}
+      <div className="dps-foot"><button className="dps-btn" onClick={onClose}>{t('cancel')}</button></div>
     </Modal>
   )
 }
@@ -263,25 +263,25 @@ export function CreateFlow({ api, t, onClose, onDone }: { api: InstallApi; t: T;
 
   return (
     <Modal title={t('createTitle')} lead={t('createLead')} onClose={onClose}>
-      <div className="smc-field">
-        <label htmlFor="smc-cn">{t('fieldName')}</label>
-        <input id="smc-cn" className="smc-mono-input" value={name} onChange={event => setName(event.target.value)} placeholder="weekly-status-report" />
-        <div className="smc-hint">{t('fieldNameHint')}</div>
+      <div className="dps-field">
+        <label htmlFor="dps-cn">{t('fieldName')}</label>
+        <input id="dps-cn" className="dps-mono-input" value={name} onChange={event => setName(event.target.value)} placeholder="weekly-status-report" />
+        <div className="dps-hint">{t('fieldNameHint')}</div>
       </div>
-      <div className="smc-field">
-        <label htmlFor="smc-cd">{t('fieldDescription')}</label>
-        <textarea id="smc-cd" rows={3} value={description} onChange={event => setDescription(event.target.value)} />
-        <div className="smc-hint">{t('fieldDescriptionHint')}</div>
+      <div className="dps-field">
+        <label htmlFor="dps-cd">{t('fieldDescription')}</label>
+        <textarea id="dps-cd" rows={3} value={description} onChange={event => setDescription(event.target.value)} />
+        <div className="dps-hint">{t('fieldDescriptionHint')}</div>
       </div>
-      <div className="smc-field">
-        <label htmlFor="smc-ci">{t('fieldInstructions')}</label>
-        <textarea id="smc-ci" rows={6} value={instructions} onChange={event => setInstructions(event.target.value)} />
+      <div className="dps-field">
+        <label htmlFor="dps-ci">{t('fieldInstructions')}</label>
+        <textarea id="dps-ci" rows={6} value={instructions} onChange={event => setInstructions(event.target.value)} />
       </div>
       {checks ? <VerifyList checks={checks} t={t} /> : null}
-      {error ? <div className="smc-err">{error}</div> : null}
-      <div className="smc-foot">
-        <button className="smc-btn" onClick={onClose}>{t('cancel')}</button>
-        <button className="smc-btn smc-primary" disabled={busy || !name.trim() || !description.trim()} onClick={() => void submit()}>{t('create')}</button>
+      {error ? <div className="dps-err">{error}</div> : null}
+      <div className="dps-foot">
+        <button className="dps-btn" onClick={onClose}>{t('cancel')}</button>
+        <button className="dps-btn dps-primary" disabled={busy || !name.trim() || !description.trim()} onClick={() => void submit()}>{t('create')}</button>
       </div>
     </Modal>
   )
@@ -299,12 +299,12 @@ export function AiFlow({ t, onClose, onInsert }: { t: T; onClose: () => void; on
   const prompt = t('aiPrompt')
   return (
     <Modal title={t('aiTitle')} lead={t('aiLead')} onClose={onClose}>
-      <div className="smc-composer"><p>{prompt}</p></div>
-      {copied ? <div className="smc-hint" style={{ marginTop: 10 }}>{t('aiInserted')}</div> : null}
-      <div className="smc-foot">
-        <button className="smc-btn" onClick={onClose}>{t('cancel')}</button>
+      <div className="dps-composer"><p>{prompt}</p></div>
+      {copied ? <div className="dps-hint" style={{ marginTop: 10 }}>{t('aiInserted')}</div> : null}
+      <div className="dps-foot">
+        <button className="dps-btn" onClick={onClose}>{t('cancel')}</button>
         <button
-          className="smc-btn smc-primary"
+          className="dps-btn dps-primary"
           onClick={() => {
             onClose()
             if (!onInsert(prompt)) { void navigator.clipboard?.writeText(prompt); setCopied(true) }
@@ -347,40 +347,40 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
   return (
     <Modal title={t('directoryTitle')} lead={t('directoryLead')} onClose={onClose} wide>
       <form
-        className="smc-bar"
+        className="dps-bar"
         onSubmit={event => { event.preventDefault(); load(query, topic) }}
       >
         <input
-          className="smc-input"
+          className="dps-input"
           placeholder={t('searchRepos')}
           value={query}
           onChange={event => setQuery(event.target.value)}
         />
-        <button className="smc-btn smc-primary" type="submit" disabled={busy}>{t('searchGo')}</button>
+        <button className="dps-btn dps-primary" type="submit" disabled={busy}>{t('searchGo')}</button>
       </form>
 
-      <div className="smc-bar">
+      <div className="dps-bar">
         {(state?.topics ?? ['agent-skills']).map(name => (
           <button
             key={name}
-            className={`smc-chip smc-topic${name === topic ? ' smc-topic-on' : ''}`}
+            className={`dps-chip dps-topic${name === topic ? ' dps-topic-on' : ''}`}
             onClick={() => { setTopic(name); load(query, name) }}
           >{name}</button>
         ))}
       </div>
 
-      {state?.error ? <div className="smc-err">{t('registryError', { error: state.error })}</div> : null}
-      {busy ? <div className="smc-empty">…</div> : null}
+      {state?.error ? <div className="dps-err">{t('registryError', { error: state.error })}</div> : null}
+      {busy ? <div className="dps-empty">…</div> : null}
       {state && !state.error && !busy && state.entries.length === 0
-        ? <div className="smc-empty">{t('registryEmpty')}</div> : null}
+        ? <div className="dps-empty">{t('registryEmpty')}</div> : null}
 
-      <div className="smc-cards">
+      <div className="dps-cards">
         {(state?.entries ?? []).map(entry => (
-          <div className="smc-card2" key={entry.name}>
-            <div className="smc-card-top">
-              <button className="smc-cn smc-link" onClick={() => setOpen(entry)}>{entry.name}</button>
+          <div className="dps-card2" key={entry.name}>
+            <div className="dps-card-top">
+              <button className="dps-cn dps-link" onClick={() => setOpen(entry)}>{entry.name}</button>
               <button
-                className={`smc-act${entry.installed ? ' smc-act-on' : ''}`}
+                className={`dps-act${entry.installed ? ' dps-act-on' : ''}`}
                 aria-label={entry.installed ? t('installed') : t('install')}
                 // Only onInstall. Calling onClose() after it clears the very
                 // flow onInstall just switched to, and the install dialog
@@ -388,17 +388,17 @@ export function DirectoryFlow({ api, t, onClose, onInstall }: {
                 onClick={() => onInstall(entry.install)}
               >{entry.installed ? '✓' : '＋'}</button>
             </div>
-            <div className="smc-cm">
+            <div className="dps-cm">
               <span>{entry.source}</span>
-              {entry.version ? <span className="smc-ver">{entry.version}</span> : null}
+              {entry.version ? <span className="dps-ver">{entry.version}</span> : null}
             </div>
-            <div className="smc-cd">{entry.description}</div>
+            <div className="dps-cd">{entry.description}</div>
           </div>
         ))}
       </div>
 
-      <p className="smc-hint">{t('directoryNote')}</p>
-      <div className="smc-foot"><button className="smc-btn" onClick={onClose}>{t('cancel')}</button></div>
+      <p className="dps-hint">{t('directoryNote')}</p>
+      <div className="dps-foot"><button className="dps-btn" onClick={onClose}>{t('cancel')}</button></div>
     </Modal>
   )
 }
@@ -426,20 +426,20 @@ function RepoDetail({ entry, api, t, onBack, onInstall }: {
 
   return (
     <Modal title={entry.name} lead={entry.description} onClose={onBack} wide>
-      <div className="smc-bar">
-        <button className="smc-btn" onClick={onBack}>‹ {t('back')}</button>
-        <span className="smc-chip">{entry.source}</span>
-        <a className="smc-btn" href={entry.install} target="_blank" rel="noreferrer noopener">{t('openOnGithub')}</a>
-        <span className="smc-spacer" />
-        <button className="smc-btn smc-primary" onClick={() => onInstall(entry.install)}>{t('installReview')}</button>
+      <div className="dps-bar">
+        <button className="dps-btn" onClick={onBack}>‹ {t('back')}</button>
+        <span className="dps-chip">{entry.source}</span>
+        <a className="dps-btn" href={entry.install} target="_blank" rel="noreferrer noopener">{t('openOnGithub')}</a>
+        <span className="dps-spacer" />
+        <button className="dps-btn dps-primary" onClick={() => onInstall(entry.install)}>{t('installReview')}</button>
       </div>
-      {error ? <div className="smc-err">{error}</div> : null}
-      <div className="smc-pane">
-        <div className="smc-pane-bar"><span>README</span></div>
-        <pre className="smc-pre">{text || (error ? '' : '…')}</pre>
+      {error ? <div className="dps-err">{error}</div> : null}
+      <div className="dps-pane">
+        <div className="dps-pane-bar"><span>README</span></div>
+        <pre className="dps-pre">{text || (error ? '' : '…')}</pre>
       </div>
-      <p className="smc-hint">{t('directoryNote')}</p>
-      <div className="smc-foot"><button className="smc-btn" onClick={onBack}>{t('back')}</button></div>
+      <p className="dps-hint">{t('directoryNote')}</p>
+      <div className="dps-foot"><button className="dps-btn" onClick={onBack}>{t('back')}</button></div>
     </Modal>
   )
 }

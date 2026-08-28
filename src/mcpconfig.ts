@@ -15,7 +15,7 @@
  * the user's, it is full of their comments, and every one of them survives a
  * save that only touches MCP entries.
  *
- * @module dsh-skill-mcp-console/mcpconfig
+ * @module dsh-plugin-station/mcpconfig
  */
 
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -165,7 +165,7 @@ function configFor(name: string, server: UniversalServer, previous?: Record<stri
 /** Timestamped copy beside the file, so any write is recoverable. */
 export async function backup(file: string): Promise<string> {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const target = join(dirname(file), `cordis.patch.yml.smc-${stamp}`)
+  const target = join(dirname(file), `cordis.patch.yml.dps-${stamp}`)
   await copyFile(file, target).catch(() => {})
   return target
 }
@@ -258,7 +258,7 @@ export interface ToolPolicy { [server: string]: string[] }
 
 /** Where per-tool opt-outs live. */
 export function policyPath(home: string): string {
-  return join(home, '.dsh', 'skill-mcp-console-tools.json')
+  return join(home, '.dsh', 'plugin-station-tools.json')
 }
 
 /** Read the per-tool opt-outs, tolerating absence and corruption. */

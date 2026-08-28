@@ -18,7 +18,7 @@
  * equals. Listing a skill the agent cannot reach is the bug this panel
  * exists to expose, not to commit.
  *
- * @module dsh-skill-mcp-console/skills
+ * @module dsh-plugin-station/skills
  */
 
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -44,7 +44,7 @@ export const ROOTS: { rel: string; origin: string; native: boolean }[] = [
 ]
 
 /** Never part of a skill. */
-const IGNORED = new Set(['node_modules', '.git', '.DS_Store', '.smc-backup'])
+const IGNORED = new Set(['node_modules', '.git', '.DS_Store', '.dps-backup'])
 
 /** Cap on the file text the detail pane will load. */
 const MAX_FILE_BYTES = 256 * 1024
@@ -290,7 +290,7 @@ function setDescription(raw: string, value: string): string {
 
 /** Backup directory kept beside the skill so a bad edit is recoverable. */
 function backupDir(dir: string): string {
-  return join(dir, '.smc-backup')
+  return join(dir, '.dps-backup')
 }
 
 /**
@@ -299,7 +299,7 @@ function backupDir(dir: string): string {
  *
  * The three states are exactly the three meaningful combinations of dsh's
  * own two booleans, so nothing here invents behaviour the harness does not
- * already have. Every write copies the file into `<skill>/.smc-backup/`
+ * already have. Every write copies the file into `<skill>/.dps-backup/`
  * first.
  */
 export async function setSkillState(_home: string, dir: string, state: SkillState): Promise<void> {

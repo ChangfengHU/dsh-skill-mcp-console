@@ -1,9 +1,9 @@
 /**
- * The client Remote contribution for the `skillMcpConsole` namespace. The
+ * The client Remote contribution for the `pluginStation` namespace. The
  * descriptor list is the same frozen literal the host TYPERT manifest
  * registers, imported rather than restated so the faces cannot drift.
  *
- * @module dsh-skill-mcp-console/client/remote
+ * @module dsh-plugin-station/client/remote
  */
 
 import { CONSOLE_INVOCATIONS, PKG } from '../wire.ts'
@@ -16,6 +16,6 @@ export const CONSOLE_REMOTE = Object.freeze({
 
 /** Unwrap a `RemoteResult`, turning a transport error into a thrown one. */
 export function unwrap<T>(result: { ok: boolean; value?: T; error?: { code: string; message: string } }, method: string): T {
-  if (!result.ok) throw new Error(`skillMcpConsole.${method}: ${result.error?.code}: ${result.error?.message}`)
+  if (!result.ok) throw new Error(`pluginStation.${method}: ${result.error?.code}: ${result.error?.message}`)
   return result.value as T
 }

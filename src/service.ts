@@ -1,5 +1,5 @@
 /**
- * The `skillMcpConsole` Remote service: everything both panels read and every
+ * The `pluginStation` Remote service: everything both panels read and every
  * mutation they make.
  *
  * Facts only. dsh's official MCP client exposes no status seam, so a server
@@ -10,7 +10,7 @@
  *
  * Every write backs up first and reports where the backup went.
  *
- * @module dsh-skill-mcp-console/service
+ * @module dsh-plugin-station/service
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -46,7 +46,7 @@ function patchFile(home: string, profile = 'web'): string {
 const SKILL_TOPICS = ['agent-skills', 'claude-skills', 'claude-skill', 'agent-skill', 'skill-md']
 
 /** Read-and-write service for both panels. */
-export class SkillMcpConsoleService extends TypertRemoteService {
+export class PluginStationService extends TypertRemoteService {
   static inject = ['loader', 'tools']
 
   /** Staged install directories, keyed by the token handed to the client. */
@@ -71,7 +71,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   constructor(ctx: Context) {
     // The key registers the Cordis service AND names the wire namespace, so
     // it has to match the `namespace` every descriptor in ./wire.ts declares.
-    super(ctx, 'skillMcpConsole')
+    super(ctx, 'pluginStation')
   }
 
   private get home(): string { return homedir() }
@@ -329,7 +329,7 @@ export class SkillMcpConsoleService extends TypertRemoteService {
    * you pick — a repository is rarely one skill.
    *
    * Unauthenticated search is rate-limited to a handful of queries a minute;
-   * `SMC_GITHUB_TOKEN` lifts that for anyone who hits it.
+   * `DPS_GITHUB_TOKEN` lifts that for anyone who hits it.
    */
   async directory(payload: string): Promise<string> {
     const { query, topic } = JSON.parse(payload || '{}') as { query?: string; topic?: string }
@@ -341,14 +341,14 @@ export class SkillMcpConsoleService extends TypertRemoteService {
     const headers: Record<string, string> = {
       accept: 'application/vnd.github+json',
       // GitHub rejects requests with no user agent outright.
-      'user-agent': 'dsh-skill-mcp-console',
+      'user-agent': 'dsh-plugin-station',
     }
-    if (process.env.SMC_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.SMC_GITHUB_TOKEN}`
+    if (process.env.DPS_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.DPS_GITHUB_TOKEN}`
 
     try {
       const response = await fetch(url, { headers })
       if (!response.ok) {
-        const hint = response.status === 403 ? ' (rate limit — set SMC_GITHUB_TOKEN)' : ''
+        const hint = response.status === 403 ? ' (rate limit — set DPS_GITHUB_TOKEN)' : ''
         throw new Error(`${response.status} ${response.statusText}${hint}`)
       }
       const body = (await response.json()) as { items?: GithubRepo[] }
@@ -382,8 +382,8 @@ export class SkillMcpConsoleService extends TypertRemoteService {
   async repoReadme(payload: string): Promise<string> {
     const { repo } = JSON.parse(payload) as { repo: string }
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error('expected owner/repo')
-    const headers: Record<string, string> = { accept: 'application/vnd.github.raw', 'user-agent': 'dsh-skill-mcp-console' }
-    if (process.env.SMC_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.SMC_GITHUB_TOKEN}`
+    const headers: Record<string, string> = { accept: 'application/vnd.github.raw', 'user-agent': 'dsh-plugin-station' }
+    if (process.env.DPS_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.DPS_GITHUB_TOKEN}`
     const response = await fetch(`https://api.github.com/repos/${repo}/readme`, { headers })
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
     const text = await response.text()

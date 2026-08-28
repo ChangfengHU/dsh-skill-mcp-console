@@ -1,4 +1,4 @@
-# dsh-skill-mcp-console
+# dsh-plugin-station
 
 Skills and MCP as two **top-level** sections in DeepSeek Harness settings.
 
@@ -22,7 +22,7 @@ domain rather than `localhost`.
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-skill-mcp-console
+dsh plugin --profile web add dsh-plugin-station
 ```
 
 Restart dsh. Two new entries appear in Settings: **Skills** and **MCP**.
@@ -79,7 +79,7 @@ policy booleans. It is implemented by parking the full description in this
 plugin's own file and writing the skill's name in its place, so the model
 still knows the skill exists without paying for the prose. Reverting restores
 the original text verbatim, and every frontmatter edit is backed up into
-`<skill>/.smc-backup/` first.
+`<skill>/.dps-backup/` first.
 
 ## Finding skills
 
@@ -93,7 +93,7 @@ It searches, it does not curate. What comes back is third-party code that
 will hold your machine's credentials — the install flow shows what it
 downloaded and checks what landed, but read the `SKILL.md` before you trust
 one. Unauthenticated search is rate-limited to a few queries a minute;
-`SMC_GITHUB_TOKEN` lifts that.
+`DPS_GITHUB_TOKEN` lifts that.
 
 There is deliberately no built-in index of "our" skills. An index that
 enumerates a deployment's internal tooling on a public URL turns *public but
@@ -119,7 +119,7 @@ the whole plugin tree fails to load.
 
 ```bash
 pnpm pack
-dsh plugin --profile web add ./dsh-skill-mcp-console-0.1.0.tgz
+dsh plugin --profile web add ./dsh-plugin-station-0.1.0.tgz
 ```
 
 ## Licence
@@ -151,7 +151,7 @@ MIT
 ## 安装
 
 ```bash
-dsh plugin --profile web add dsh-skill-mcp-console
+dsh plugin --profile web add dsh-plugin-station
 ```
 
 重启 dsh,设置里会多出 **Skills** 和 **MCP** 两项。
@@ -197,7 +197,7 @@ frontmatter 里写的是别的名字。**打个菜单什么都没装的安装脚
 **`仅名字` 这一档 dsh 里没有对应语义** —— 注册表只有两个策略布尔值。它是这样
 实现的:把完整描述存进本插件自己的文件,frontmatter 里换成技能名,模型仍然
 知道这个技能存在,但不再为那段长文付费。切回去时原文逐字恢复,而且每次改
-frontmatter 之前都会先备份到 `<技能>/.smc-backup/`。
+frontmatter 之前都会先备份到 `<技能>/.dps-backup/`。
 
 ## 怎么找技能
 
@@ -208,7 +208,7 @@ frontmatter 之前都会先备份到 `<技能>/.smc-backup/`。
 
 它只负责搜,不负责背书。搜出来的是第三方代码,而技能是会拿到你机器凭据的
 脚本 —— 安装流程会给你看下载了什么、并校验落地情况,但**信任它之前先读
-`SKILL.md`**。未认证的搜索每分钟只有几次配额,`SMC_GITHUB_TOKEN` 可以放开。
+`SKILL.md`**。未认证的搜索每分钟只有几次配额,`DPS_GITHUB_TOKEN` 可以放开。
 
 **故意不内置"我们自己的"技能索引。** 把一个部署的内部工具枚举在公网地址上,
 等于把"公开但不可枚举"变成"这是清单";何况那些本来就已经装好了 ——

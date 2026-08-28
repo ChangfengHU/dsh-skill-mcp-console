@@ -9,7 +9,7 @@
  * still want in every request" is a question you can only answer with the
  * number in front of you.
  *
- * @module dsh-skill-mcp-console/client/McpSection
+ * @module dsh-plugin-station/client/McpSection
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -31,23 +31,23 @@ function ServerCard({ row, api, t, onChanged }: { row: McpRow; api: McpApi; t: T
   const [busy, setBusy] = useState('')
 
   return (
-    <div className={`smc-card${row.disabled ? ' smc-card-off' : ''}`}>
-      <div className="smc-row">
+    <div className={`dps-card${row.disabled ? ' dps-card-off' : ''}`}>
+      <div className="dps-row">
         <button
-          className="smc-caret"
+          className="dps-caret"
           aria-expanded={open}
           aria-label={row.name}
           onClick={() => setOpen(value => !value)}
         >{open ? '▼' : '▶'}</button>
-        <div className="smc-grow">
-          <div className="smc-name">{row.name}</div>
-          <div className="smc-mono smc-trunc">{row.transport}{row.target ? ` · ${row.target}` : ''}</div>
+        <div className="dps-grow">
+          <div className="dps-name">{row.name}</div>
+          <div className="dps-mono dps-trunc">{row.transport}{row.target ? ` · ${row.target}` : ''}</div>
         </div>
-        <span className="smc-chip">{tok(row.tokens)} tok</span>
-        <span className={`smc-chip ${row.tools.length ? 'smc-ok' : 'smc-warn'}`}>{row.tools.length} {t('tools')}</span>
-        {row.fiber ? <span className={`smc-chip ${row.fiber === 'failed' ? 'smc-warn' : ''}`}>{row.fiber}</span> : null}
+        <span className="dps-chip">{tok(row.tokens)} tok</span>
+        <span className={`dps-chip ${row.tools.length ? 'dps-ok' : 'dps-warn'}`}>{row.tools.length} {t('tools')}</span>
+        {row.fiber ? <span className={`dps-chip ${row.fiber === 'failed' ? 'dps-warn' : ''}`}>{row.fiber}</span> : null}
         <button
-          className="smc-toggle"
+          className="dps-toggle"
           aria-pressed={!row.disabled}
           aria-label={row.name}
           disabled={busy === 'server' || !row.entryId}
@@ -58,16 +58,16 @@ function ServerCard({ row, api, t, onChanged }: { row: McpRow; api: McpApi; t: T
         />
       </div>
       {open ? (
-        <div className="smc-tools">
+        <div className="dps-tools">
           {row.tools.length === 0
-            ? <div className="smc-tool"><span>{t('noTools')}</span></div>
+            ? <div className="dps-tool"><span>{t('noTools')}</span></div>
             : row.tools.map(tool => (
-              <div className={`smc-tool${tool.disabled ? ' smc-dim' : ''}`} key={tool.name}>
+              <div className={`dps-tool${tool.disabled ? ' dps-dim' : ''}`} key={tool.name}>
                 <code>mcp__{row.name}__{tool.name}</code>
-                <span className="smc-trunc">{tool.description}</span>
-                <span className="smc-ttok">{tool.tokens} tok</span>
+                <span className="dps-trunc">{tool.description}</span>
+                <span className="dps-ttok">{tool.tokens} tok</span>
                 <button
-                  className="smc-tool-toggle"
+                  className="dps-tool-toggle"
                   aria-pressed={!tool.disabled}
                   aria-label={tool.name}
                   disabled={busy === tool.name}
@@ -122,47 +122,47 @@ export function McpSection({ api, t }: { api: McpApi; t: T }) {
   const resident = rows?.filter(row => !row.disabled).reduce((total, row) => total + row.tokens, 0) ?? 0
 
   return (
-    <div className="smc-root">
-      <div className="smc-head">
+    <div className="dps-root">
+      <div className="dps-head">
         <div>
           <h3>{t('mcpTitle')}</h3>
           <p>{t('mcpLead')}</p>
         </div>
-        <div className="smc-spacer" />
-        <div className="smc-switch" role="tablist">
+        <div className="dps-spacer" />
+        <div className="dps-switch" role="tablist">
           <button role="tab" aria-selected={view === 'list'} onClick={() => setView('list')}>{t('list')}</button>
           <button role="tab" aria-selected={view === 'json'} onClick={() => setView('json')}>{t('json')}</button>
         </div>
       </div>
 
-      {error ? <div className="smc-err">{error}</div> : null}
-      {notice ? <div className="smc-okbox">{notice}<br />{t('restartNote')}</div> : null}
+      {error ? <div className="dps-err">{error}</div> : null}
+      {notice ? <div className="dps-okbox">{notice}<br />{t('restartNote')}</div> : null}
 
       {view === 'list' ? (
         <>
-          <div className="smc-bar">
+          <div className="dps-bar">
             <span>{rows === null ? '…' : <><b>{rows.length}</b> {t('servers')} · <b>{toolCount}</b> {t('tools')}</>}</span>
-            <span className="smc-budget">
-              <span className="smc-bl">{t('resident')} {t('approx')}</span><b>{tok(resident)}</b> tok
+            <span className="dps-budget">
+              <span className="dps-bl">{t('resident')} {t('approx')}</span><b>{tok(resident)}</b> tok
             </span>
-            <span className="smc-spacer" />
-            <button className="smc-btn" onClick={load}>{t('refresh')}</button>
+            <span className="dps-spacer" />
+            <button className="dps-btn" onClick={load}>{t('refresh')}</button>
           </div>
           {rows !== null && rows.length === 0
-            ? <div className="smc-empty">{t('noServers')}</div>
+            ? <div className="dps-empty">{t('noServers')}</div>
             : rows?.map(row => <ServerCard key={row.entryId || row.name} row={row} api={api} t={t} onChanged={load} />)}
         </>
       ) : (
         <>
-          <div className="smc-bar"><span>{t('jsonLead')}</span></div>
-          <div className="smc-bar">
-            <span className="smc-chip smc-warn">{t('jsonMasked')}</span>
-            <span className="smc-spacer" />
-            <button className="smc-btn" disabled={busy || draft === json} onClick={() => setDraft(json)}>{t('revert')}</button>
-            <button className="smc-btn smc-primary" disabled={busy || draft === json} onClick={() => void save()}>{t('save')}</button>
+          <div className="dps-bar"><span>{t('jsonLead')}</span></div>
+          <div className="dps-bar">
+            <span className="dps-chip dps-warn">{t('jsonMasked')}</span>
+            <span className="dps-spacer" />
+            <button className="dps-btn" disabled={busy || draft === json} onClick={() => setDraft(json)}>{t('revert')}</button>
+            <button className="dps-btn dps-primary" disabled={busy || draft === json} onClick={() => void save()}>{t('save')}</button>
           </div>
           <textarea
-            className="smc-editor"
+            className="dps-editor"
             spellCheck={false}
             value={draft}
             onChange={event => setDraft(event.target.value)}

@@ -1,5 +1,5 @@
 /**
- * `dsh-skill-mcp-console` — Skills and MCP as two top-level Settings sections.
+ * `dsh-plugin-station` — Skills and MCP as two top-level Settings sections.
  *
  * Why this exists, given how many capability panels the ecosystem already
  * has: every one measured before writing it fails at least one of these, and
@@ -24,18 +24,18 @@
  * Function plugin — no default export (the Loader unwraps
  * `exports.default ?? exports`).
  *
- * @module dsh-skill-mcp-console
+ * @module dsh-plugin-station
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { SkillMcpConsoleService } from './service.ts'
+import { PluginStationService } from './service.ts'
 
-export const name = 'skill-mcp-console'
+export const name = 'plugin-station'
 
 /** The facts the panels read: composition entries and the tool registry. */
 export const inject = ['tools', 'loader']
 
-export { SkillMcpConsoleService } from './service.ts'
+export { PluginStationService } from './service.ts'
 export {
   ROOTS, parseFrontmatter, readSkillFile, removeSkill, rootsFor,
   scanSkills, setSkillState, stateOf, tildify,
@@ -63,5 +63,5 @@ export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
  * @param ctx - context carrying the tool registry and the loader.
  */
 export async function apply(ctx: Context): Promise<void> {
-  await ctx.plugin(SkillMcpConsoleService)
+  await ctx.plugin(PluginStationService)
 }

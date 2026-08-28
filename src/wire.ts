@@ -1,5 +1,5 @@
 /**
- * Wire contract for the `skillMcpConsole` Remote namespace — the invocation
+ * Wire contract for the `pluginStation` Remote namespace — the invocation
  * descriptors shared verbatim by the host TYPERT manifest and the client
  * Remote contribution, so the two faces can never drift.
  *
@@ -9,13 +9,13 @@
  * that one `z.string()` per side instead of a schema per shape, on a surface
  * that is still moving.
  *
- * @module dsh-skill-mcp-console/wire
+ * @module dsh-plugin-station/wire
  */
 
 import { z } from 'zod'
 
 /** Package id, repeated in every descriptor id and in both Typert faces. */
-export const PKG = 'dsh-skill-mcp-console'
+export const PKG = 'dsh-plugin-station'
 
 /** One JSON-string parameter. */
 function jsonParam(name: string) {
@@ -32,9 +32,9 @@ const JSON_RESULT = Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Js
 
 function descriptor(method: string, argc: 0 | 1) {
   return Object.freeze({
-    id: `${PKG}#skillMcpConsole/${method}`,
-    service: 'skillMcpConsole',
-    namespace: 'skillMcpConsole',
+    id: `${PKG}#pluginStation/${method}`,
+    service: 'pluginStation',
+    namespace: 'pluginStation',
     method,
     invocation: Object.freeze({ kind: 'direct' }),
     parameters: Object.freeze(argc === 1 ? [jsonParam('payload')] : []),

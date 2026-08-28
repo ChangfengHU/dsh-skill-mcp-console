@@ -1,10 +1,10 @@
 /**
  * Host Typert manifest, exported as `./typert` so the harness's typert-loader
- * registers the `skillMcpConsole` invocations when this plugin mounts. Same
+ * registers the `pluginStation` invocations when this plugin mounts. Same
  * invocation list the client Remote contribution carries, so the two faces
  * cannot drift.
  *
- * @module dsh-skill-mcp-console/typert
+ * @module dsh-plugin-station/typert
  */
 
 import { CONSOLE_INVOCATIONS, PKG } from './wire.ts'

@@ -1,5 +1,5 @@
 /**
- * Browser half: mounts the `skillMcpConsole` Remote contribution and
+ * Browser half: mounts the `pluginStation` Remote contribution and
  * registers two TOP-LEVEL Settings sections.
  *
  * `settings.section` is the deliberate choice. The same panels registered
@@ -7,7 +7,7 @@
  * Plugins, which is where the ecosystem's other capability panels live and
  * why people report not finding them.
  *
- * @module dsh-skill-mcp-console/client
+ * @module dsh-plugin-station/client
  */
 
 import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
@@ -23,12 +23,12 @@ export { McpSection } from './McpSection.tsx'
 export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
-export const NS = 'settings.skillMcpConsole'
+export const NS = 'settings.pluginStation'
 
 /** Matches the package name, the graph row id, and the bundle id. */
-export const name = 'dsh-skill-mcp-console'
+export const name = 'dsh-plugin-station'
 
-/** `remote.skillMcpConsole` appears once this plugin mounts its contribution. */
+/** `remote.pluginStation` appears once this plugin mounts its contribution. */
 export const inject = ['slots', 'locale', 'remote']
 
 /**
@@ -37,8 +37,8 @@ export const inject = ['slots', 'locale', 'remote']
  * @param ctx - client root context.
  */
 export async function apply(ctx: any): Promise<void> {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'skill-mcp-console: dictionaries')
-  ctx.effect(() => installStyles(), 'skill-mcp-console: stylesheet')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin-station: dictionaries')
+  ctx.effect(() => installStyles(), 'plugin-station: stylesheet')
 
   await ctx.remote.$mount(CONSOLE_REMOTE)
 
@@ -46,7 +46,7 @@ export async function apply(ctx: any): Promise<void> {
   /** Translate, then substitute `{placeholders}`. */
   const t = (key: ConsoleLocaleKey, params?: Record<string, string | number>) => fill(String(bound(key) ?? key), params)
 
-  const remote = () => ctx.get('remote.skillMcpConsole')
+  const remote = () => ctx.get('remote.pluginStation')
   const call = async <T,>(method: string, payload?: unknown): Promise<T> => {
     const service = remote()
     const result = payload === undefined ? await service[method]() : await service[method](JSON.stringify(payload))
@@ -87,7 +87,7 @@ export async function apply(ctx: any): Promise<void> {
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'skill-mcp-console-skills',
+    id: 'plugin-station-skills',
     order: 26,
     label: () => t('skillsNav'),
     locale: NS,
@@ -96,7 +96,7 @@ export async function apply(ctx: any): Promise<void> {
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'skill-mcp-console-mcp',
+    id: 'plugin-station-mcp',
     order: 27,
     label: () => t('mcpNav'),
     locale: NS,
@@ -142,7 +142,7 @@ function startNewSessionWith(text: string): boolean {
 
       window.setTimeout(() => {
         const field = Array.from(document.querySelectorAll<HTMLTextAreaElement>('textarea'))
-          .find(el => el.offsetParent !== null && !el.closest('.smc-root') && !el.closest('.smc-modal'))
+          .find(el => el.offsetParent !== null && !el.closest('.dps-root') && !el.closest('.dps-modal'))
         if (!field) return
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
         setter?.call(field, text)
