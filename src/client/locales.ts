@@ -11,6 +11,8 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  removeConfirmRestart: "Removes it from the profile, then restarts dsh — required, because a removed plugin left running takes the whole UI down.",
+
   restartRemoved: "Uninstalled but still running: {list}. Their menus and settings stay on screen until dsh restarts.",
 
   tabFeatured: "Picks",
@@ -202,6 +204,8 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  removeConfirmRestart: "从 profile 移除后会立即重启 dsh——这一步必须做：卸掉的插件如果继续挂在运行中的进程里，整个界面会打不开。",
+
   restartRemoved: "已卸载但还在跑：{list}。它们的菜单和设置页会一直留在界面上，直到 dsh 重启。",
 
   tabFeatured: "精选",

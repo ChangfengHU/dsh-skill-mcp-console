@@ -26,7 +26,7 @@ import type { T } from './ui.tsx'
 export interface PluginsApi {
   codePlugins: () => Promise<{ installed: PackageRow[]; builtinEntries: number; builtinPackages: number; profile: string }>
   setPluginDisabled: (entryId: string, disabled: boolean) => Promise<void>
-  removePlugin: (name: string) => Promise<{ code: number; log: string }>
+  removePlugin: (name: string) => Promise<{ code: number; log: string; mustRestart?: boolean }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string }>
   pendingRestart: () => Promise<{ added: string[]; removed: string[] }>
   restartHost: () => Promise<{ restarting: boolean }>
@@ -36,7 +36,9 @@ export interface PluginsApi {
 const BROKEN = new Set(['failed', 'disposed'])
 
 /** One installed package and everything it put into the composition. */
-function PackageCard({ row, api, t, onChanged }: { row: PackageRow; api: PluginsApi; t: T; onChanged: () => void }) {
+function PackageCard({ row, api, t, onChanged, onRemoved }: {
+  row: PackageRow; api: PluginsApi; t: T; onChanged: () => void; onRemoved: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -102,14 +104,21 @@ function PackageCard({ row, api, t, onChanged }: { row: PackageRow; api: Plugins
           <div className="dps-actions">
             {confirming ? (
               <>
-                <span className="dps-hint">{t('removeConfirm')}</span>
+                <span className="dps-hint">{t('removeConfirmRestart')}</span>
                 <button className="dps-btn" onClick={() => setConfirming(false)}>{t('cancel')}</button>
                 <button
                   className="dps-btn dps-danger"
                   disabled={busy !== ''}
                   onClick={async () => {
                     setBusy('remove')
-                    try { await api.removePlugin(row.name); onChanged() } finally { setBusy(''); setConfirming(false) }
+                    try {
+                      const result = await api.removePlugin(row.name)
+                      onChanged()
+                      // Not a courtesy refresh: until the Host restarts, its
+                      // fiber is live against files that no longer exist and
+                      // the next page load fails the whole plugin tree.
+                      if (result.mustRestart) onRemoved()
+                    } finally { setBusy(''); setConfirming(false) }
                   }}
                 >{busy === 'remove' ? t('working') : t('remove')}</button>
               </>
@@ -137,6 +146,7 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
   const [log, setLog] = useState('')
   const [busy, setBusy] = useState(false)
   const [restartNonce, setRestartNonce] = useState(0)
+  const [autoRestart, setAutoRestart] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -151,7 +161,7 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
 
   return (
     <div className="dps-root">
-      <RestartBar api={api} t={t} nonce={restartNonce} />
+      <RestartBar api={api} t={t} nonce={restartNonce} auto={autoRestart} />
       <p className="dps-hint">{t('pluginsBlurb')}</p>
 
       <div className="dps-bar">
@@ -185,7 +195,8 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
             {meta.profile ? <span className="dps-dim"> · {t('profile')} {meta.profile}</span> : null}
           </div>
           {rows.map(row => (
-            <PackageCard key={row.name} row={row} api={api} t={t} onChanged={() => void load()} />
+            <PackageCard key={row.name} row={row} api={api} t={t}
+              onChanged={() => void load()} onRemoved={() => setAutoRestart(true)} />
           ))}
           {rows.length === 0 ? <p className="dps-hint">{t('noPlugins')}</p> : null}
           <p className="dps-hint">{t('builtinFolded', { entries: meta.builtinEntries, packages: meta.builtinPackages })}</p>

@@ -489,11 +489,30 @@ export class PluginStationService extends TypertRemoteService {
     return JSON.stringify({ backup: backupPath })
   }
 
-  /** Remove a package from the profile by re-invoking the Host's own CLI. */
+  /**
+   * Remove a package from the profile by re-invoking the Host's own CLI.
+   *
+   * A removal is not symmetrical with an install. A newly installed package
+   * simply sits inert until a restart; a newly REMOVED one leaves a fiber
+   * running against files that are gone, and the browser then asks for a
+   * client bundle that returns 404 — which fails the whole plugin tree and
+   * takes the entire UI down, not just that plugin's menus. Measured, on
+   * this deployment, by removing a plugin and reloading: "Failed to load
+   * plugins … client.js failed to load", and nothing else renders.
+   *
+   * So the reply says the Host must restart, and the panel acts on it
+   * without waiting to be told. Leaving that choice to someone means
+   * offering them a broken app as one of the options.
+   */
   async removePlugin(payload: string): Promise<string> {
     const { name } = JSON.parse(payload) as { name: string }
     if (!SAFE_PACKAGE.test(name)) throw new Error(`refusing to remove ${JSON.stringify(name)}`)
-    return JSON.stringify(await dshPlugin(['remove', name]))
+    if (this.installing) throw new Error(`already installing ${this.installing} — one at a time`)
+    this.installing = name
+    try {
+      const result = await dshPlugin(['remove', name])
+      return JSON.stringify({ ...result, mustRestart: result.code === 0 })
+    } finally { this.installing = null }
   }
 
   /**

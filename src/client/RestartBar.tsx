@@ -25,7 +25,9 @@ export interface RestartApi {
  * @param t - translator.
  * @param nonce - bump to re-check after an install.
  */
-export function RestartBar({ api, t, nonce = 0 }: { api: RestartApi; t: T; nonce?: number }) {
+export function RestartBar({ api, t, nonce = 0, auto = false }: {
+  api: RestartApi; t: T; nonce?: number; auto?: boolean
+}) {
   const [added, setAdded] = useState<string[]>([])
   const [removed, setRemoved] = useState<string[]>([])
   const [going, setGoing] = useState(false)
@@ -39,6 +41,16 @@ export function RestartBar({ api, t, nonce = 0 }: { api: RestartApi; t: T; nonce
   }, [api])
 
   useEffect(() => { void check() }, [check, nonce])
+
+  // A removal leaves the Host running against deleted files, so the restart
+  // is not optional and is not worth a click. Installs stay manual: an
+  // inert new plugin harms nothing, and interrupting someone mid-browse to
+  // restart the app would.
+  useEffect(() => {
+    if (!auto || going) return
+    setGoing(true)
+    void api.restartHost()
+  }, [auto, going, api])
 
   // After the request the process is gone; polling is what notices it is
   // back, and reloading then is what makes the new plugin's browser half
