@@ -16,7 +16,7 @@ import type { T } from './ui.tsx'
 
 /** The two calls this bar needs. */
 export interface RestartApi {
-  pendingRestart: () => Promise<{ pending: string[] }>
+  pendingRestart: () => Promise<{ added: string[]; removed: string[] }>
   restartHost: () => Promise<{ restarting: boolean }>
 }
 
@@ -26,11 +26,16 @@ export interface RestartApi {
  * @param nonce - bump to re-check after an install.
  */
 export function RestartBar({ api, t, nonce = 0 }: { api: RestartApi; t: T; nonce?: number }) {
-  const [pending, setPending] = useState<string[]>([])
+  const [added, setAdded] = useState<string[]>([])
+  const [removed, setRemoved] = useState<string[]>([])
   const [going, setGoing] = useState(false)
 
   const check = useCallback(async () => {
-    try { setPending((await api.pendingRestart()).pending) } catch { /* leave it quiet */ }
+    try {
+      const result = await api.pendingRestart()
+      setAdded(result.added ?? [])
+      setRemoved(result.removed ?? [])
+    } catch { /* leave it quiet */ }
   }, [api])
 
   useEffect(() => { void check() }, [check, nonce])
@@ -50,12 +55,20 @@ export function RestartBar({ api, t, nonce = 0 }: { api: RestartApi; t: T; nonce
     return () => clearInterval(timer)
   }, [going])
 
-  if (pending.length === 0 && !going) return null
+  if (added.length === 0 && removed.length === 0 && !going) return null
 
   return (
     <div className="dps-restart">
       <span className="dps-grow">
-        {going ? t('restarting') : t('restartPending', { list: pending.join(', ') })}
+        {going ? t('restarting') : (
+          <>
+            {added.length ? <div>{t('restartPending', { list: added.join(', ') })}</div> : null}
+            {/* A removed package whose fiber is still running is the more
+                confusing of the two: its menus are still on screen, so the
+                uninstall looks like it did nothing at all. */}
+            {removed.length ? <div>{t('restartRemoved', { list: removed.join(', ') })}</div> : null}
+          </>
+        )}
       </span>
       {!going ? (
         <button className="dps-btn dps-primary" onClick={async () => { setGoing(true); await api.restartHost() }}>

@@ -31,7 +31,7 @@ export interface MarketApi {
   catalog: (query: { query?: string; category?: string; sort?: string; page?: number; featured?: boolean }) => Promise<CatalogPage>
   refreshCatalog: () => Promise<{ total: number }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string; restartRequired?: boolean }>
-  pendingRestart: () => Promise<{ pending: string[] }>
+  pendingRestart: () => Promise<{ added: string[]; removed: string[] }>
   restartHost: () => Promise<{ restarting: boolean }>
 }
 

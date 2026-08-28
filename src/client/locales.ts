@@ -11,6 +11,8 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  restartRemoved: "Uninstalled but still running: {list}. Their menus and settings stay on screen until dsh restarts.",
+
   tabFeatured: "Picks",
   tabAll: "All",
   featuredCount: "{n} picks — short on purpose, and each says why",
@@ -200,6 +202,8 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  restartRemoved: "已卸载但还在跑：{list}。它们的菜单和设置页会一直留在界面上，直到 dsh 重启。",
+
   tabFeatured: "精选",
   tabAll: "全部",
   featuredCount: "{n} 条精选——刻意短，而且每条都说明理由",

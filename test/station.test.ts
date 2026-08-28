@@ -506,3 +506,29 @@ describe('market catalog', () => {
     assert.equal(picks.entries.filter(r => r.name === 'dsh-plugin-station').length, 1)
   })
 })
+
+describe('restart accounting', () => {
+  // Both directions are the point: reporting only new packages was the bug
+  // that made an uninstall look like it had done nothing, because the
+  // removed plugin's menus stayed on screen until something restarted dsh.
+  const split = (declared: string[], live: string[]) => ({
+    added: declared.filter(n => !live.includes(n)).sort(),
+    removed: live.filter(n => !declared.includes(n) && !n.startsWith('@deepseek-ai')).sort(),
+  })
+
+  it('reports a fresh install as pending', () => {
+    assert.deepEqual(split(['a', 'b'], ['a']), { added: ['b'], removed: [] })
+  })
+
+  it('reports a removal whose fiber is still running', () => {
+    assert.deepEqual(split(['a'], ['a', 'b']), { added: [], removed: ['b'] })
+  })
+
+  it('never asks for a restart over the Host\'s own packages', () => {
+    assert.deepEqual(split(['a'], ['a', '@deepseek-ai/dsh-web']), { added: [], removed: [] })
+  })
+
+  it('says nothing when the two ledgers agree', () => {
+    assert.deepEqual(split(['a', 'b'], ['b', 'a']), { added: [], removed: [] })
+  })
+})

@@ -28,7 +28,7 @@ export interface PluginsApi {
   setPluginDisabled: (entryId: string, disabled: boolean) => Promise<void>
   removePlugin: (name: string) => Promise<{ code: number; log: string }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string }>
-  pendingRestart: () => Promise<{ pending: string[] }>
+  pendingRestart: () => Promise<{ added: string[]; removed: string[] }>
   restartHost: () => Promise<{ restarting: boolean }>
 }
 

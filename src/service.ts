@@ -542,14 +542,21 @@ export class PluginStationService extends TypertRemoteService {
    * is never going to happen on its own.
    */
   async pendingRestart(): Promise<string> {
-    const declared = Object.keys(await this.profileDependencies())
+    const declared = new Set(Object.keys(await this.profileDependencies()))
     const live = new Set<string>()
     for (const entry of this.ctx.loader.entries()) {
       const module = typeof entry.options.name === 'string' ? entry.options.name : ''
       if (!module) continue
       live.add(module.startsWith('@') ? module.split('/').slice(0, 2).join('/') : module.split('/')[0]!)
     }
-    return JSON.stringify({ pending: declared.filter(name => !live.has(name)) })
+    // Both directions matter, and only one of them was reported before.
+    // A removal leaves the package gone from disk and from the profile while
+    // its fiber keeps running — menus and settings pages it registered stay
+    // on screen, which reads as "the uninstall did nothing".
+    return JSON.stringify({
+      added: [...declared].filter(name => !live.has(name)).sort(),
+      removed: [...live].filter(name => !declared.has(name) && !name.startsWith('@deepseek-ai')).sort(),
+    })
   }
 
   /**
