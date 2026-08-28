@@ -139,9 +139,16 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
   const install = async (row: CatalogEntry) => {
     setBusy(row.full); setLog('')
     try {
-      const result = await api.addPlugin(row.spec)
-      setLog(result.restartRequired ? `${result.log}\n\n${t('restartHint')}` : result.log)
-      if (result.code === 0) { await load(); setRestartNonce(n => n + 1); onInstalled?.() }
+      // Same hazard as removal: installing rewrites the profile, the loader
+      // re-applies the composition, and this plugin's entry can be rebuilt
+      // mid-call. A lost reply is not a failed install, so the timer decides
+      // when to stop waiting and the catalog re-read decides what happened.
+      const result = await Promise.race([
+        api.addPlugin(row.spec).catch(() => null),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 90_000)),
+      ])
+      setLog(result ? (result.restartRequired ? `${result.log}\n\n${t('restartHint')}` : result.log) : t('replyLost'))
+      await load(); setRestartNonce(n => n + 1); onInstalled?.()
     } catch (cause) { setLog(String(cause)) } finally { setBusy('') }
   }
 

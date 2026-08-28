@@ -111,14 +111,26 @@ function PackageCard({ row, api, t, onChanged, onRemoved }: {
                   disabled={busy !== ''}
                   onClick={async () => {
                     setBusy('remove')
+                    // The reply cannot be relied on. Removing a package
+                    // rewrites the profile, the loader re-applies the
+                    // composition, and this plugin's own entry is rebuilt
+                    // along with everything else — so the in-flight call is
+                    // killed by the very work it asked for. Waiting on it
+                    // leaves the button saying "Working…" forever, which is
+                    // what it did.
+                    //
+                    // Racing a short timer covers both outcomes: a reply
+                    // that arrives, and one that never can. Either way the
+                    // removal has been ordered and the restart is what
+                    // makes the result true, so both paths end there.
                     try {
-                      const result = await api.removePlugin(row.name)
-                      onChanged()
-                      // Not a courtesy refresh: until the Host restarts, its
-                      // fiber is live against files that no longer exist and
-                      // the next page load fails the whole plugin tree.
-                      if (result.mustRestart) onRemoved()
-                    } finally { setBusy(''); setConfirming(false) }
+                      await Promise.race([
+                        api.removePlugin(row.name).catch(() => null),
+                        new Promise(resolve => setTimeout(resolve, 4000)),
+                      ])
+                    } finally {
+                      setBusy(''); setConfirming(false); onChanged(); onRemoved()
+                    }
                   }}
                 >{busy === 'remove' ? t('working') : t('remove')}</button>
               </>
