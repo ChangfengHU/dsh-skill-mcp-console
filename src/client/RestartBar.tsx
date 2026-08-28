@@ -52,18 +52,26 @@ export function RestartBar({ api, t, nonce = 0, auto = false }: {
     void api.restartHost()
   }, [auto, going, api])
 
-  // After the request the process is gone; polling is what notices it is
-  // back, and reloading then is what makes the new plugin's browser half
-  // actually load. Nothing here assumes a particular supervisor — if
-  // nothing restarts it, the bar simply keeps waiting and says so.
+  // Wait for the Host to go DOWN before waiting for it to come back.
+  //
+  // Reloading on the first successful probe reloads against the process
+  // that is still on its way out — it answers for the few hundred
+  // milliseconds between the reply and the exit — so the page comes back
+  // showing exactly the state the restart was meant to change. Requiring a
+  // failed probe first is what makes "it is back" mean a different process.
+  //
+  // If it never goes down, nothing reloads and the bar keeps saying so,
+  // which is the honest outcome where no supervisor restarts it.
   useEffect(() => {
     if (!going) return
+    let sawDown = false
     const timer = setInterval(async () => {
       try {
         const response = await fetch(`${location.origin}/`, { method: 'HEAD', cache: 'no-store' })
-        if (response.ok) location.reload()
-      } catch { /* still down */ }
-    }, 2000)
+        if (!response.ok) { sawDown = true; return }
+        if (sawDown) location.reload()
+      } catch { sawDown = true }
+    }, 1000)
     return () => clearInterval(timer)
   }, [going])
 
