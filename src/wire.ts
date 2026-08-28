@@ -49,6 +49,7 @@ export const METHODS = [
   ['mcp', 0], ['mcpJson', 0], ['saveMcpJson', 1], ['setMcpDisabled', 1], ['setToolDisabled', 1],
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
+  ['codePlugins', 0], ['setPluginDisabled', 1], ['removePlugin', 1], ['addPlugin', 1],
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */
@@ -116,6 +117,36 @@ export interface McpRow {
   tools: McpTool[]
   /** Sum of the enabled tools' schema cost. */
   tokens: number
+}
+
+/** One live composition entry, as the code-plugin view reports it. */
+export interface PluginEntryRow {
+  /** The entry id in the composition — what a patch layer addresses. */
+  id: string
+  /** The module specifier the loader resolved, e.g. `dshmarket/client`. */
+  module: string
+  /** Whether a patch layer has switched this entry off. */
+  disabled: boolean
+  /**
+   * The fiber's phase: `active`, `failed`, `loading`, … or null when the
+   * entry has no fiber at all. This is the honest state; `disabled` is only
+   * the intent, and an enabled entry can still be `failed`.
+   */
+  fiber: string | null
+}
+
+/** One installed package, with every composition entry it contributed. */
+export interface PackageRow {
+  name: string
+  version: string | null
+  description: string
+  /** The dependency spec: a range, `github:owner/repo`, a tarball, `link:`. */
+  source: string
+  /** Whether it declares `dsh.bundle` — i.e. it is a plugin, not a dependency. */
+  bundled: boolean
+  /** Whether it ships a browser half. */
+  hasClient: boolean
+  entries: PluginEntryRow[]
 }
 
 /** What an install string was recognised as. */

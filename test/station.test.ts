@@ -16,7 +16,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { detect, findSkills, isSafeSkillName, verify } from '../src/install.ts'
-import { fromUniversal, phaseOf, toUniversal } from '../src/mcpconfig.ts'
+import { fromUniversal, phaseOf, setEntryDisabled, toUniversal } from '../src/mcpconfig.ts'
+import { collectPackages, packageOf } from '../src/plugins.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
 
@@ -360,5 +361,71 @@ describe('findSkills', () => {
     const found = await findSkills(root)
     assert.deepEqual(found.map(candidate => candidate.name), ['alpha', 'beta'])
     await rm(root, { recursive: true, force: true })
+  })
+})
+
+describe('code plugins', () => {
+  it('reads the package out of a plain, scoped or subpath specifier', () => {
+    assert.equal(packageOf('dshmarket'), 'dshmarket')
+    assert.equal(packageOf('dshmarket/client'), 'dshmarket')
+    assert.equal(packageOf('@deepseek-ai/dsh-web'), '@deepseek-ai/dsh-web')
+    assert.equal(packageOf('@deepseek-ai/dsh-web/app'), '@deepseek-ai/dsh-web')
+  })
+
+  it('groups entries under the packages the profile declares, folding the rest', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dps-plugins-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { dshmarket: '^1.0.0', 'dsh-plugin-station': 'github:o/r', '@deepseek-ai/dsh-web': '^0.1.0' },
+    }))
+    await mkdir(join(dir, 'node_modules', 'dshmarket'), { recursive: true })
+    await writeFile(join(dir, 'node_modules', 'dshmarket', 'package.json'), JSON.stringify({
+      name: 'dshmarket', version: '1.30.0', description: 'market', dsh: { bundle: { patch: './p.yml' }, client: {} },
+    }))
+
+    const { installed, builtinEntries } = await collectPackages(dir, [
+      { id: 'market', module: 'dshmarket', disabled: false, fiber: 'active' },
+      { id: 'market-client', module: 'dshmarket/client', disabled: false, fiber: 'active' },
+      { id: 'web', module: '@deepseek-ai/dsh-web', disabled: false, fiber: 'active' },
+      { id: 'timer', module: '@deepseek-ai/dsh-core/timer', disabled: false, fiber: 'active' },
+    ])
+
+    // Host-scope dependencies never count as something the user installed,
+    // even when the profile declares them.
+    assert.deepEqual(installed.map(p => p.name), ['dsh-plugin-station', 'dshmarket'])
+    const market = installed.find(p => p.name === 'dshmarket')!
+    assert.equal(market.version, '1.30.0')
+    assert.equal(market.bundled, true)
+    assert.equal(market.hasClient, true)
+    // Both of its entries land on it, including the subpath one.
+    assert.deepEqual(market.entries.map(e => e.id), ['market', 'market-client'])
+    // A declared package with nothing on disk still lists, so a half-installed
+    // dependency is visible rather than silently absent.
+    assert.equal(installed.find(p => p.name === 'dsh-plugin-station')!.version, null)
+    assert.equal(builtinEntries, 2)
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('patches an existing entry rather than inserting a duplicate id', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dps-patch-'))
+    const file = join(dir, 'cordis.patch.yml')
+    await writeFile(file, '# keep me\n- id: llm-deepseek\n  config:\n    baseURL: http://x\n\n- insert:\n    - id: mcp-vault\n      name: c\n')
+
+    await setEntryDisabled(file, 'mcp-vault', true)
+    let text = await readFile(file, 'utf8')
+    assert.match(text, /- id: mcp-vault\n\s+name: c\n\s+disabled: true/)
+    assert.match(text, /# keep me/, 'comments survive')
+    // The id lives under insert:, and must not gain a second root-level entry.
+    assert.equal(text.match(/mcp-vault/g)!.length, 1)
+
+    // An id the layer never mentioned is appended at the root — a patch of an
+    // entry the composition already has, not a new insert.
+    await setEntryDisabled(file, 'plugin-station', true)
+    text = await readFile(file, 'utf8')
+    assert.match(text, /- id: plugin-station\n\s+disabled: true/)
+
+    await setEntryDisabled(file, 'mcp-vault', false)
+    text = await readFile(file, 'utf8')
+    assert.doesNotMatch(text, /name: c\n\s+disabled: true/)
+    await rm(dir, { recursive: true, force: true })
   })
 })

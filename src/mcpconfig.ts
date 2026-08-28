@@ -247,6 +247,61 @@ export async function setDisabled(file: string, name: string, disabled: boolean)
 }
 
 /**
+ * Switch any composition entry off or back on by its id.
+ *
+ * The MCP panel has its own version keyed on server name; this one is keyed
+ * on the entry id, because a code plugin's entries have no other stable
+ * handle — `plugin-station`, `dshmarket` and the rest are addressed the way
+ * a patch layer addresses them.
+ *
+ * An id the patch layer does not mention yet gets an entry appended under
+ * `insert:`, which is how a disable survives without the user having written
+ * that entry by hand.
+ *
+ * @param file - the profile's patch layer.
+ * @param entryId - the composition entry's id.
+ * @param disabled - true to switch it off.
+ * @returns the backup path written before the edit.
+ */
+export async function setEntryDisabled(file: string, entryId: string, disabled: boolean): Promise<string> {
+  const backupPath = await backup(file)
+  const doc = await loadPatch(file)
+
+  // The patch layer is a list, and its two item shapes mean different
+  // things: `- id: x` PATCHES the existing entry x, while `- insert: [...]`
+  // ADDS entries. Switching off something the composition already has is a
+  // patch, so a missing id is appended at the root — never under `insert:`,
+  // which would try to create a second entry with the same id.
+  const found = findEntry(doc.contents as YAMLSeq, entryId)
+  if (found) {
+    if (disabled) found.set('disabled', true)
+    else found.delete('disabled')
+  } else if (disabled) {
+    ;(doc.contents as YAMLSeq).add(doc.createNode({ id: entryId, disabled: true }))
+  } else {
+    // Nothing mentions it and nothing is being switched off: already on.
+    return backupPath
+  }
+  await writeFile(file, doc.toString({ lineWidth: 0 }), 'utf8')
+  return backupPath
+}
+
+/** The map patching a given entry id, searching nested `insert:` lists too. */
+function findEntry(seq: YAMLSeq, entryId: string): YAMLMap | null {
+  for (const item of seq.items) {
+    if (!isMap(item)) continue
+    const insert = item.get('insert', true)
+    if (isSeq(insert)) {
+      const nested = findEntry(insert, entryId)
+      if (nested) return nested
+      continue
+    }
+    if (String(item.get('id') ?? '') === entryId) return item
+  }
+  return null
+}
+
+/**
  * Per-tool opt-outs.
  *
  * dsh has no seam for hiding one tool of a connected server, so this plugin

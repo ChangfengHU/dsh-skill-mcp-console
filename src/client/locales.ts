@@ -11,6 +11,23 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  codePluginsNav: "Code plugins",
+  pluginsBlurb: "The packages you installed into this deployment. The Host's own list is one row per composition entry, and most of those entries are the Host itself; this one lists only yours, grouped by package, and reports the fiber phase rather than the toggle's intent.",
+  yourPlugins: "installed",
+  noPlugins: "No third-party packages in this profile.",
+  builtinFolded: "{entries} more entries come from {packages} packages the Host ships. Folded away — you did not install them, and they are rarely yours to change.",
+  entries: "entries",
+  entryId: "Entry id",
+  module: "Module",
+  state: "State",
+  noEntries: "This package registered no composition entries — it may be disabled, or a plain dependency rather than a plugin.",
+  notAPlugin: "not a plugin",
+  hasClient: "browser half",
+  removeConfirm: "Removes it from the profile and recomposes; dsh restarts.",
+  addPluginPlaceholder: "npm name / github:owner/repo / tarball URL",
+  profile: "profile",
+  working: "Working…",
+
   skillsNav: 'Skills',
   mcpNav: 'MCP',
 
@@ -150,6 +167,23 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  codePluginsNav: "代码插件",
+  pluginsBlurb: "这个部署里你自己装的包。dsh 原生的插件列表按组合条目展开，其中绝大多数是 dsh 自己的内部单元；这里只列你装的，按包分组，状态取 fiber 真值而不是开关意图。",
+  yourPlugins: "个你装的包",
+  noPlugins: "这个 profile 里没有第三方包。",
+  builtinFolded: "另有 {entries} 条组合项来自 dsh 自带的 {packages} 个包，已折叠——它们不是你装的，通常也不该动。",
+  entries: "条组合项",
+  entryId: "条目 id",
+  module: "模块",
+  state: "状态",
+  noEntries: "这个包没有向组合注册任何条目——可能没启用，也可能它只是个普通依赖。",
+  notAPlugin: "非插件",
+  hasClient: "带前端",
+  removeConfirm: "将从 profile 移除并重新组合，dsh 会重启。",
+  addPluginPlaceholder: "npm 包名 / github:owner/repo / tarball 地址",
+  profile: "profile",
+  working: "执行中…",
+
   skillsNav: '技能',
   mcpNav: 'MCP',
 

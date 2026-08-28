@@ -10,8 +10,9 @@
  * @module dsh-plugin-station/client
  */
 
-import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
+import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, PackageRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
 import { McpSection, type McpApi } from './McpSection.tsx'
+import { PluginsSection, type PluginsApi } from './PluginsSection.tsx'
 import { SkillsSection, type SkillsApi } from './SkillsSection.tsx'
 import { en, zh, type ConsoleLocaleKey } from './locales.ts'
 import { CONSOLE_REMOTE, unwrap } from './remote.ts'
@@ -20,6 +21,7 @@ import { fill } from './ui.tsx'
 
 export { SkillsSection } from './SkillsSection.tsx'
 export { McpSection } from './McpSection.tsx'
+export { PluginsSection } from './PluginsSection.tsx'
 export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
@@ -84,6 +86,24 @@ export async function apply(ctx: any): Promise<void> {
     setMcpDisabled: async (name_, disabled) => { await call('setMcpDisabled', { name: name_, disabled }) },
     setToolDisabled: async (server, tool, disabled) => { await call('setToolDisabled', { server, tool, disabled }) },
   }
+
+  const pluginsApi: PluginsApi = {
+    codePlugins: () => call<{ installed: PackageRow[]; builtinEntries: number; builtinPackages: number; profile: string }>('codePlugins'),
+    setPluginDisabled: async (entryId, disabled) => { await call('setPluginDisabled', { entryId, disabled }) },
+    removePlugin: name_ => call<{ code: number; log: string }>('removePlugin', { name: name_ }),
+    addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
+  }
+
+  // A tab on the Host's own Plugins page, not another top-level entry: code
+  // plugins belong there, and the Host publishes this slot for exactly this.
+  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
+    name: 'settings.plugins.tab',
+    id: 'plugin-station-code-plugins',
+    order: 30,
+    label: () => t('codePluginsNav'),
+    locale: NS,
+    inject: () => ({ api: pluginsApi, t }),
+  }, PluginsSection))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

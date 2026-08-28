@@ -329,6 +329,17 @@ a.dps-btn { text-decoration: none; display: inline-block; }
 .dps-cd { font-size: 12px; opacity: .72; line-height: 1.55;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* code-plugin tab */
+.dps-body { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px;
+  border-top: 1px solid var(--dps-line); }
+.dps-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.dps-btn.dps-danger { border-color: var(--dps-bad); color: var(--dps-bad); }
+.dps-btn.dps-danger:hover:not(:disabled) { background: var(--dps-bad-bg); }
+.dps-count { font-size: 12.5px; opacity: .75; padding: 2px 0; }
+.dps-log { margin: 0; font-family: var(--dps-mono); font-size: 11.5px; line-height: 1.55;
+  background: var(--dps-surface); border: 1px solid var(--dps-line); border-radius: 8px;
+  padding: 9px 11px; max-height: 190px; overflow: auto; white-space: pre-wrap; }
+
 @media (prefers-reduced-motion: reduce) { .dps-root *, .dps-modal * { transition: none !important; } }
 `
 

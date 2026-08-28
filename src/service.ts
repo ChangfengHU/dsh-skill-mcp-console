@@ -25,9 +25,11 @@ import {
   MCP_CLIENT_MODULE, fromUniversal, phaseOf, readToolPolicy, setDisabled, toUniversal, writeToolPolicy,
   type UniversalServer,
 } from './mcpconfig.ts'
+import { spawn } from 'node:child_process'
+import { collectPackages } from './plugins.ts'
 import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.ts'
 import { estimateToolTokens } from './tokens.ts'
-import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wire.ts'
+import type { DirectoryEntry, McpRow, McpTool, PluginEntryRow, SkillRow, SkillState } from './wire.ts'
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
@@ -37,9 +39,70 @@ function defaultRoot(home: string): string {
   return join(home, '.agents', 'skills')
 }
 
+/**
+ * Which profile this Host booted.
+ *
+ * The launcher puts it in argv (`dsh --profile web …`), and reading it back
+ * is the only way a plugin learns which of several profiles it is living in.
+ * Everything that writes to the profile — the patch layer, `dsh plugin add`
+ * — has to agree with this, or a two-profile machine edits the wrong one.
+ */
+function profileName(argv: string[] = process.argv): string {
+  const flag = argv.indexOf('--profile')
+  const next = flag >= 0 ? argv[flag + 1] : undefined
+  if (next && !next.startsWith('-')) return next
+  const inline = argv.find(a => a.startsWith('--profile='))
+  return inline ? inline.slice('--profile='.length) : 'web'
+}
+
+/** The booted profile's directory. */
+function profileDir(home: string, profile = profileName()): string {
+  return join(home, '.dsh', 'profiles', profile)
+}
+
 /** Where the profile patch layer lives. */
-function patchFile(home: string, profile = 'web'): string {
-  return join(home, '.dsh', 'profiles', profile, 'cordis.patch.yml')
+function patchFile(home: string, profile = profileName()): string {
+  return join(profileDir(home, profile), 'cordis.patch.yml')
+}
+
+/**
+ * What a package name is allowed to look like before it reaches a CLI.
+ *
+ * The specifier for `add` can be a URL and is checked differently; a name to
+ * REMOVE is always a plain package name, and anything else reaching that
+ * argument is a mistake worth refusing rather than passing along.
+ */
+const SAFE_PACKAGE = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i
+
+/**
+ * Run `dsh plugin --profile <p> …` and report what it said.
+ *
+ * Installing a plugin means resolving peers, writing the lockfile, and
+ * recomposing the profile, and the Host's own CLI already does all of it —
+ * so this re-invokes that CLI rather than reimplementing the package manager
+ * behind it. `process.argv[1]` is the launcher this Host booted from, which
+ * keeps a multi-version machine on the same dsh that is running.
+ *
+ * No shell: arguments go to the child as an array, so a specifier can hold
+ * whatever npm allows without any of it being interpreted here.
+ */
+function dshPlugin(args: string[], timeoutMs = 420_000): Promise<{ code: number; log: string }> {
+  const launcher = process.argv[1]
+  if (!launcher) throw new Error('cannot locate the dsh launcher this Host booted from')
+  return new Promise(resolve => {
+    const child = spawn(
+      process.execPath,
+      [launcher, 'plugin', '--profile', profileName(), ...args],
+      { cwd: profileDir(homedir()), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    let log = ''
+    const take = (chunk: Buffer) => { log += chunk.toString('utf8') }
+    child.stdout?.on('data', take)
+    child.stderr?.on('data', take)
+    const timer = setTimeout(() => { child.kill('SIGKILL'); log += '\ntimed out' }, timeoutMs)
+    child.on('error', error => { clearTimeout(timer); resolve({ code: -1, log: `${log}\n${String(error)}` }) })
+    child.on('close', code => { clearTimeout(timer); resolve({ code: code ?? -1, log: log.slice(-8000) }) })
+  })
 }
 
 /** GitHub topics the Agent Skills format actually collects under. */
@@ -388,6 +451,53 @@ export class PluginStationService extends TypertRemoteService {
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
     const text = await response.text()
     return JSON.stringify({ text: text.length > 60_000 ? text.slice(0, 60_000) + '\n\n…' : text })
+  }
+
+  // ── code plugins ──────────────────────────────────────────────────────
+
+  /**
+   * The packages installed into this profile, with their live entries.
+   *
+   * The Host's own Plugin list answers a different question — every
+   * composition entry, the great majority of which are the Host itself. This
+   * answers "what did I install, and is it working".
+   */
+  async codePlugins(): Promise<string> {
+    const entries: PluginEntryRow[] = []
+    for (const entry of this.ctx.loader.entries()) {
+      const module = typeof entry.options.name === 'string' ? entry.options.name : ''
+      if (!module) continue
+      entries.push({
+        id: String(entry.options.id ?? ''),
+        module,
+        disabled: Boolean(entry.disabled),
+        fiber: phaseOf(entry.fiber),
+      })
+    }
+    const grouped = await collectPackages(profileDir(this.home), entries)
+    return JSON.stringify({ ...grouped, profile: profileName() })
+  }
+
+  /** Switch one composition entry off or back on, through the patch layer. */
+  async setPluginDisabled(payload: string): Promise<string> {
+    const { entryId, disabled } = JSON.parse(payload) as { entryId: string; disabled: boolean }
+    const backupPath = await setEntryDisabled(patchFile(this.home), entryId, disabled)
+    return JSON.stringify({ backup: backupPath })
+  }
+
+  /** Remove a package from the profile by re-invoking the Host's own CLI. */
+  async removePlugin(payload: string): Promise<string> {
+    const { name } = JSON.parse(payload) as { name: string }
+    if (!SAFE_PACKAGE.test(name)) throw new Error(`refusing to remove ${JSON.stringify(name)}`)
+    return JSON.stringify(await dshPlugin(['remove', name]))
+  }
+
+  /** Install a package into the profile the same way. */
+  async addPlugin(payload: string): Promise<string> {
+    const { spec } = JSON.parse(payload) as { spec: string }
+    const target = spec.trim()
+    if (!target || /\s/.test(target)) throw new Error('one package specifier, no spaces')
+    return JSON.stringify(await dshPlugin(['add', target]))
   }
 }
 

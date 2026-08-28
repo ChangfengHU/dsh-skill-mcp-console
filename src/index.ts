@@ -42,17 +42,18 @@ export {
 } from './skills.ts'
 export {
   MCP_CLIENT_MODULE, backup, fromUniversal, loadPatch, phaseOf, policyPath, readToolPolicy,
-  setDisabled, toUniversal, writeToolPolicy,
+  setDisabled, setEntryDisabled, toUniversal, writeToolPolicy,
 } from './mcpconfig.ts'
 export {
   cleanup, createSkill, detect, findSkills, peek, place, run, runShell, stage,
   uploadSkill, verify,
 } from './install.ts'
+export { collectPackages, packageOf } from './plugins.ts'
 export { estimateToolTokens, estimateTokens, formatTokens } from './tokens.ts'
 export { CONSOLE_INVOCATIONS, METHODS, PKG } from './wire.ts'
 export type {
-  DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, SkillRow,
-  SkillState, VerifyCheck,
+  DirectoryEntry, InstallCandidate, InstallPlan, McpRow, McpTool, PackageRow,
+  PluginEntryRow, SkillRow, SkillState, VerifyCheck,
 } from './wire.ts'
 export type { Frontmatter } from './skills.ts'
 export type { ToolPolicy, UniversalServer } from './mcpconfig.ts'
