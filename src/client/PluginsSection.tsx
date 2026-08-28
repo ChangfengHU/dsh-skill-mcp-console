@@ -56,8 +56,9 @@ function PackageCard({ row, api, t, onChanged }: { row: PackageRow; api: Plugins
         </div>
         {!row.bundled ? <span className="dps-chip dps-warn">{t('notAPlugin')}</span> : null}
         {row.hasClient ? <span className="dps-chip">{t('hasClient')}</span> : null}
-        <span className="dps-chip">{row.entries.length} {t('entries')}</span>
+        <span className="dps-chip">{row.entries.length} {t(row.entries.length === 1 ? 'entryOne' : 'entries')}</span>
         {broken.length ? <span className="dps-chip dps-warn">{broken[0]!.fiber}</span> : null}
+        <span className="dps-dim dps-state">{off ? t('disabled') : t('enabled')}</span>
         <button
           className="dps-toggle"
           aria-pressed={!off}
@@ -70,7 +71,7 @@ function PackageCard({ row, api, t, onChanged }: { row: PackageRow; api: Plugins
               onChanged()
             } finally { setBusy('') }
           }}
-        >{off ? t('disabled') : t('enabled')}</button>
+        />
       </div>
 
       {open ? (
