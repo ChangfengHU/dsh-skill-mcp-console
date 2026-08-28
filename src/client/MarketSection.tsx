@@ -29,14 +29,14 @@ import { tok, type T } from './ui.tsx'
 export interface MarketApi {
   catalog: (query: { query?: string; category?: string; sort?: string; page?: number }) => Promise<CatalogPage>
   refreshCatalog: () => Promise<{ total: number }>
-  addPlugin: (spec: string) => Promise<{ code: number; log: string }>
+  addPlugin: (spec: string) => Promise<{ code: number; log: string; restartRequired?: boolean }>
 }
 
 const SORTS = ['score', 'downloads', 'stars', 'recent'] as const
 
 /** One installable row. */
-function Card({ row, t, onInstall, busy }: {
-  row: CatalogEntry; t: T; busy: string; onInstall: (row: CatalogEntry) => void
+function Card({ row, t, onInstall, busy, elapsed }: {
+  row: CatalogEntry; t: T; busy: string; elapsed: number; onInstall: (row: CatalogEntry) => void
 }) {
   return (
     <div className="dps-card dps-mkt">
@@ -55,14 +55,20 @@ function Card({ row, t, onInstall, busy }: {
         </div>
         <span className="dps-chip">{row.score}</span>
         {row.installed ? (
-          <span className="dps-chip dps-ok">{t('installed')}</span>
+          // Declared but not yet live: the package is on disk and in the
+          // patch, and its fiber only exists after a restart. Saying just
+          // "installed" here would leave someone wondering why nothing
+          // changed in the app.
+          <span className={`dps-chip ${row.active ? 'dps-ok' : 'dps-warn'}`}>
+            {row.active ? t('installed') : t('needsRestart')}
+          </span>
         ) : (
           <button
             className="dps-btn"
             disabled={busy !== '' || !row.spec}
             title={row.spec || t('noSpec')}
             onClick={() => onInstall(row)}
-          >{busy === row.full ? t('working') : t('install')}</button>
+          >{busy === row.full ? `${t("working")} ${elapsed}s` : t("install")}</button>
         )}
       </div>
       {row.description ? <p className="dps-cd">{row.description}</p> : null}
@@ -86,6 +92,7 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
   const [sort, setSort] = useState<string>('score')
   const [pageIndex, setPageIndex] = useState(0)
   const [busy, setBusy] = useState('')
+  const [elapsed, setElapsed] = useState(0)
   const [log, setLog] = useState('')
   const [error, setError] = useState('')
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -110,11 +117,20 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
     return () => { if (debounce.current) clearTimeout(debounce.current) }
   }, [query])
 
+  // A pnpm install can take a minute on a cold store, and a button that
+  // says only "Working…" for that long is indistinguishable from a hang.
+  useEffect(() => {
+    if (busy === '') { setElapsed(0); return }
+    const started = Date.now()
+    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [busy])
+
   const install = async (row: CatalogEntry) => {
     setBusy(row.full); setLog('')
     try {
       const result = await api.addPlugin(row.spec)
-      setLog(result.log)
+      setLog(result.restartRequired ? `${result.log}\n\n${t('restartHint')}` : result.log)
       if (result.code === 0) { await load(); onInstalled?.() }
     } catch (cause) { setLog(String(cause)) } finally { setBusy('') }
   }
@@ -148,7 +164,7 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
             {query.trim() === '' ? <span className="dps-dim"> · {t('foldedNote')}</span> : null}
           </div>
           {data.entries.map(row => (
-            <Card key={row.full} row={row} t={t} busy={busy} onInstall={install} />
+            <Card key={row.full} row={row} t={t} busy={busy} elapsed={elapsed} onInstall={install} />
           ))}
           {data.entries.length === 0 ? <p className="dps-hint">{t('marketEmpty')}</p> : null}
           {data.pages > 1 ? (

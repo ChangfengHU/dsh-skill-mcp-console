@@ -129,6 +129,9 @@ export class PluginStationService extends TypertRemoteService {
    */
   private scanCache: { at: number; rows: Promise<SkillRow[]> } | null = null
 
+  /** The specifier currently being installed, if any. See `addPlugin`. */
+  private installing: string | null = null
+
   /**
    * @param ctx - context carrying the loader and the tool registry.
    */
@@ -504,12 +507,26 @@ export class PluginStationService extends TypertRemoteService {
   async catalog(payload: string): Promise<string> {
     const query = JSON.parse(payload || '{}') as CatalogQuery
     const rows = await loadCatalog(this.home)
-    const installed = new Set<string>()
+    // What the profile DECLARES is the honest answer to "do I have this".
+    // The live composition lags it: a package installed a moment ago is on
+    // disk and in the patch, but its fiber only exists after a restart, so
+    // reading the loader alone makes a fresh install look like it failed.
+    const declared = new Set<string>(Object.keys(await this.profileDependencies()))
+    const live = new Set<string>()
     for (const entry of this.ctx.loader.entries()) {
       const module = typeof entry.options.name === 'string' ? entry.options.name : ''
-      if (module) installed.add(module.split('/')[0]!.startsWith('@') ? module.split('/').slice(0, 2).join('/') : module.split('/')[0]!)
+      if (!module) continue
+      live.add(module.startsWith('@') ? module.split('/').slice(0, 2).join('/') : module.split('/')[0]!)
     }
-    return JSON.stringify(catalogPage(rows, query, installed))
+    return JSON.stringify(catalogPage(rows, query, declared, live))
+  }
+
+  /** The profile's direct dependencies, as its package.json declares them. */
+  private async profileDependencies(): Promise<Record<string, string>> {
+    try {
+      const text = await readFile(join(profileDir(this.home), 'package.json'), 'utf8')
+      return (JSON.parse(text) as { dependencies?: Record<string, string> }).dependencies ?? {}
+    } catch { return {} }
   }
 
   /** Drop the cached catalog so the next read refetches. */
@@ -519,12 +536,25 @@ export class PluginStationService extends TypertRemoteService {
     return JSON.stringify({ total: rows.length })
   }
 
-  /** Install a package into the profile the same way. */
+  /**
+   * Install a package into the profile the same way.
+   *
+   * Serialised on purpose. pnpm takes a lock on its content-addressable
+   * store, so a second install started while one is running does not fail —
+   * it blocks, silently, for as long as the first takes. A caller that gets
+   * told "one at a time" can say so; a caller left waiting on a lock cannot
+   * tell that apart from a hang.
+   */
   async addPlugin(payload: string): Promise<string> {
     const { spec } = JSON.parse(payload) as { spec: string }
     const target = spec.trim()
     if (!target || /\s/.test(target)) throw new Error('one package specifier, no spaces')
-    return JSON.stringify(await dshPlugin(['add', target]))
+    if (this.installing) throw new Error(`already installing ${this.installing} — one at a time`)
+    this.installing = target
+    try {
+      const result = await dshPlugin(['add', target])
+      return JSON.stringify({ ...result, restartRequired: result.code === 0 })
+    } finally { this.installing = null }
   }
 }
 

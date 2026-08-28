@@ -183,7 +183,12 @@ export interface CatalogQuery {
  * @param query - what the panel asked for.
  * @param installed - package names already in the profile.
  */
-export function page(rows: CatalogEntry[], query: CatalogQuery, installed: Set<string>): CatalogPage {
+export function page(
+  rows: CatalogEntry[],
+  query: CatalogQuery,
+  declared: Set<string>,
+  live: Set<string> = declared,
+): CatalogPage {
   const needle = (query.query ?? '').trim().toLowerCase()
   let list = rows.filter(row => {
     if (query.category && query.category !== 'all' && row.category !== query.category) return false
@@ -224,7 +229,11 @@ export function page(rows: CatalogEntry[], query: CatalogQuery, installed: Set<s
   const categories = [...new Set(rows.map(row => row.category).filter(Boolean))].sort()
 
   return {
-    entries: slice.map(row => ({ ...row, installed: installed.has(row.npm ?? '') || installed.has(row.name) })),
+    entries: slice.map(row => {
+      const key = row.npm ?? row.name
+      const has = declared.has(key) || declared.has(row.name)
+      return { ...row, installed: has, active: has && (live.has(key) || live.has(row.name)) }
+    }),
     total,
     page: pageIndex,
     pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),

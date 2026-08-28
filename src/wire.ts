@@ -147,8 +147,10 @@ export interface CatalogEntry {
   spec: string
   installable: boolean
   score: number
-  /** Filled in per request: whether this profile already has it. */
+  /** Filled in per request: whether the profile declares it. */
   installed?: boolean
+  /** Whether it is also live in the composition — false until a restart. */
+  active?: boolean
 }
 
 /** One page of catalog results. */

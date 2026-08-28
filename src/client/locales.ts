@@ -11,6 +11,9 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  needsRestart: "installed · restart to activate",
+  restartHint: "Installed. It joins the composition on the next dsh restart — nothing changes in the running app until then.",
+
   marketNav: "Market",
   marketSearch: "Search the catalog…",
   allCategories: "All categories",
@@ -184,6 +187,9 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  needsRestart: "已装 · 重启后生效",
+  restartHint: "已安装。它会在 dsh 下次重启时进入组合——在那之前，正在运行的应用里不会有任何变化。",
+
   marketNav: "插件市场",
   marketSearch: "搜索目录…",
   allCategories: "全部分类",
