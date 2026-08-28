@@ -337,6 +337,8 @@ a.dps-btn { text-decoration: none; display: inline-block; }
 .dps-btn.dps-danger:hover:not(:disabled) { background: var(--dps-bad-bg); }
 .dps-count { font-size: 12.5px; opacity: .75; padding: 2px 0; }
 .dps-state { font-size: 12px; white-space: nowrap; }
+.dps-restart { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px;
+  font-size: 12.8px; background: var(--dps-warn-bg); border: 1px solid var(--dps-warn); }
 .dps-select { font: inherit; font-size: 12.5px; padding: 5px 8px; border-radius: 6px; color: inherit;
   background: var(--dps-raise); border: 1px solid var(--dps-line-strong); cursor: pointer; }
 .dps-mkt { gap: 6px; }

@@ -11,6 +11,10 @@ export type ConsoleLocaleKey = keyof typeof en
 
 /** English copy. */
 export const en = {
+  restartPending: "Installed but not running yet: {list}. dsh picks them up on its next start.",
+  restartNow: "Restart now",
+  restarting: "Restarting — this page reloads as soon as dsh answers again.",
+
   needsRestart: "installed · restart to activate",
   restartHint: "Installed. It joins the composition on the next dsh restart — nothing changes in the running app until then.",
 
@@ -187,6 +191,10 @@ export const en = {
 
 /** Chinese copy. */
 export const zh: Record<ConsoleLocaleKey, string> = {
+  restartPending: "已装但还没跑起来：{list}。dsh 下次启动时才会加载它们。",
+  restartNow: "立即重启",
+  restarting: "正在重启——dsh 一恢复应答，这个页面就会自动刷新。",
+
   needsRestart: "已装 · 重启后生效",
   restartHint: "已安装。它会在 dsh 下次重启时进入组合——在那之前，正在运行的应用里不会有任何变化。",
 

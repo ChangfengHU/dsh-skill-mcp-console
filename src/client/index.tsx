@@ -94,12 +94,16 @@ export async function apply(ctx: any): Promise<void> {
     setPluginDisabled: async (entryId, disabled) => { await call('setPluginDisabled', { entryId, disabled }) },
     removePlugin: name_ => call<{ code: number; log: string }>('removePlugin', { name: name_ }),
     addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
+    pendingRestart: () => call<{ pending: string[] }>('pendingRestart'),
+    restartHost: () => call<{ restarting: boolean }>('restartHost'),
   }
 
   const marketApi: MarketApi = {
     catalog: q => call<CatalogPage>('catalog', q),
     refreshCatalog: () => call<{ total: number }>('refreshCatalog'),
-    addPlugin: spec => call<{ code: number; log: string }>('addPlugin', { spec }),
+    addPlugin: spec => call<{ code: number; log: string; restartRequired?: boolean }>('addPlugin', { spec }),
+    pendingRestart: () => call<{ pending: string[] }>('pendingRestart'),
+    restartHost: () => call<{ restarting: boolean }>('restartHost'),
   }
 
   // The market gets its own tab beside the installed list — browsing and

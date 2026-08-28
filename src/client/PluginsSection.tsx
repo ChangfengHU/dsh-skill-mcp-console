@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { PackageRow } from '../wire.ts'
+import { RestartBar } from './RestartBar.tsx'
 import type { T } from './ui.tsx'
 
 /** What this tab calls back into the host with. */
@@ -27,6 +28,8 @@ export interface PluginsApi {
   setPluginDisabled: (entryId: string, disabled: boolean) => Promise<void>
   removePlugin: (name: string) => Promise<{ code: number; log: string }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string }>
+  pendingRestart: () => Promise<{ pending: string[] }>
+  restartHost: () => Promise<{ restarting: boolean }>
 }
 
 /** Phases that mean the entry is not doing its job. */
@@ -133,6 +136,7 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
   const [spec, setSpec] = useState('')
   const [log, setLog] = useState('')
   const [busy, setBusy] = useState(false)
+  const [restartNonce, setRestartNonce] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -147,6 +151,7 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
 
   return (
     <div className="dps-root">
+      <RestartBar api={api} t={t} nonce={restartNonce} />
       <p className="dps-hint">{t('pluginsBlurb')}</p>
 
       <div className="dps-bar">
@@ -164,7 +169,7 @@ export function PluginsSection({ api, t }: { api: PluginsApi; t: T }) {
             try {
               const result = await api.addPlugin(spec.trim())
               setLog(result.log)
-              if (result.code === 0) { setSpec(''); await load() }
+              if (result.code === 0) { setSpec(''); await load(); setRestartNonce(n => n + 1) }
             } catch (cause) { setLog(String(cause)) } finally { setBusy(false) }
           }}
         >{busy ? t('working') : t('install')}</button>

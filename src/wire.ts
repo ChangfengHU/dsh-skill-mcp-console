@@ -50,7 +50,7 @@ export const METHODS = [
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
   ['codePlugins', 0], ['setPluginDisabled', 1], ['removePlugin', 1], ['addPlugin', 1],
-  ['catalog', 1], ['refreshCatalog', 0],
+  ['catalog', 1], ['refreshCatalog', 0], ['restartHost', 0], ['pendingRestart', 0],
 ] as const
 
 /** The canonical invocation list. Both faces register exactly this. */

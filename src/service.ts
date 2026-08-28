@@ -529,6 +529,45 @@ export class PluginStationService extends TypertRemoteService {
     } catch { return {} }
   }
 
+  /**
+   * Which declared packages are not live yet — i.e. what a restart would
+   * pick up.
+   *
+   * A newly installed package is on disk and in the composition file, but
+   * its fiber only exists after the process restarts: the loader's only
+   * published seam for applying one is `exit()`, described in its own types
+   * as "Hook for hosts that can restart the process on full-reload
+   * requests". So "installed" and "running" are genuinely two states here,
+   * and a panel that collapses them leaves people waiting for something that
+   * is never going to happen on its own.
+   */
+  async pendingRestart(): Promise<string> {
+    const declared = Object.keys(await this.profileDependencies())
+    const live = new Set<string>()
+    for (const entry of this.ctx.loader.entries()) {
+      const module = typeof entry.options.name === 'string' ? entry.options.name : ''
+      if (!module) continue
+      live.add(module.startsWith('@') ? module.split('/').slice(0, 2).join('/') : module.split('/')[0]!)
+    }
+    return JSON.stringify({ pending: declared.filter(name => !live.has(name)) })
+  }
+
+  /**
+   * Apply the composition by restarting the Host.
+   *
+   * `loader.exit()` is the published request; whether anything comes back up
+   * is the deployment's business — a service manager with a restart policy,
+   * or a person. The reply is sent before exiting so the panel can say what
+   * is about to happen rather than just losing its connection.
+   */
+  async restartHost(): Promise<string> {
+    setTimeout(() => {
+      try { (this.ctx.loader as { exit?: () => void }).exit?.() } catch { /* fall through */ }
+      process.exit(0)
+    }, 250)
+    return JSON.stringify({ restarting: true })
+  }
+
   /** Drop the cached catalog so the next read refetches. */
   async refreshCatalog(): Promise<string> {
     await rm(cachePath(this.home), { force: true })

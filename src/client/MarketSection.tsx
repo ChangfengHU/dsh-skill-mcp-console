@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CatalogEntry, CatalogPage } from '../wire.ts'
+import { RestartBar } from './RestartBar.tsx'
 import { tok, type T } from './ui.tsx'
 
 /** What the market calls back into the host with. */
@@ -30,6 +31,8 @@ export interface MarketApi {
   catalog: (query: { query?: string; category?: string; sort?: string; page?: number }) => Promise<CatalogPage>
   refreshCatalog: () => Promise<{ total: number }>
   addPlugin: (spec: string) => Promise<{ code: number; log: string; restartRequired?: boolean }>
+  pendingRestart: () => Promise<{ pending: string[] }>
+  restartHost: () => Promise<{ restarting: boolean }>
 }
 
 const SORTS = ['score', 'downloads', 'stars', 'recent'] as const
@@ -93,6 +96,7 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
   const [pageIndex, setPageIndex] = useState(0)
   const [busy, setBusy] = useState('')
   const [elapsed, setElapsed] = useState(0)
+  const [restartNonce, setRestartNonce] = useState(0)
   const [log, setLog] = useState('')
   const [error, setError] = useState('')
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -131,12 +135,13 @@ export function MarketSection({ api, t, onInstalled }: { api: MarketApi; t: T; o
     try {
       const result = await api.addPlugin(row.spec)
       setLog(result.restartRequired ? `${result.log}\n\n${t('restartHint')}` : result.log)
-      if (result.code === 0) { await load(); onInstalled?.() }
+      if (result.code === 0) { await load(); setRestartNonce(n => n + 1); onInstalled?.() }
     } catch (cause) { setLog(String(cause)) } finally { setBusy('') }
   }
 
   return (
     <div className="dps-root">
+      <RestartBar api={api} t={t} nonce={restartNonce} />
       <div className="dps-bar">
         <input
           className="dps-input dps-grow"
