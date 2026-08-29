@@ -37,6 +37,15 @@ function defaultRoot(home: string): string {
   return join(home, '.agents', 'skills')
 }
 
+/** The DSH profile this Host was launched with. */
+function profileName(argv: string[] = process.argv): string {
+  const flag = argv.indexOf('--profile')
+  const next = flag >= 0 ? argv[flag + 1] : undefined
+  if (next && !next.startsWith('-')) return next
+  const inline = argv.find(arg => arg.startsWith('--profile='))
+  return inline ? inline.slice('--profile='.length) : 'web'
+}
+
 /** The booted profile's directory. */
 function profileDir(home: string, profile = profileName()): string {
   return join(home, '.dsh', 'profiles', profile)
