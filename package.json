@@ -1,5 +1,5 @@
 {
-  "name": "dsh-skill-mcp",
+  "name": "dsh-skill-mcp-console",
   "version": "1.0.0",
   "description": "Skills and MCP as two top-level Settings sections in DeepSeek Harness: every skill across every root with shadowing made visible, three-state invocation policy, per-tool MCP switches, and a universal mcpServers view that keeps your comments and secrets. · 技能与 MCP 两个顶级设置区。",
   "keywords": [
@@ -69,10 +69,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ChangfengHU/dsh-skill-mcp.git"
+    "url": "git+https://github.com/ChangfengHU/dsh-skill-mcp-console.git"
   },
-  "homepage": "https://github.com/ChangfengHU/dsh-skill-mcp#readme",
+  "homepage": "https://github.com/ChangfengHU/dsh-skill-mcp-console#readme",
   "bugs": {
-    "url": "https://github.com/ChangfengHU/dsh-skill-mcp/issues"
+    "url": "https://github.com/ChangfengHU/dsh-skill-mcp-console/issues"
   }
 }

@@ -47,6 +47,14 @@ function patchFile(home: string, profile = profileName()): string {
   return join(profileDir(home, profile), 'cordis.patch.yml')
 }
 
+/** Where an MCP server lives, with any URL credentials hidden. */
+function targetOf(config: Record<string, unknown>): string {
+  if (typeof config.url === 'string') return config.url.replace(/\/\/[^@/]+@/, '//••••@')
+  const command = typeof config.command === 'string' ? config.command : ''
+  const args = Array.isArray(config.args) ? config.args.filter(a => typeof a === 'string') : []
+  return [command, ...args].join(' ').trim() || '—'
+}
+
 /** GitHub topics the Agent Skills format actually collects under. */
 const SKILL_TOPICS = ['agent-skills', 'claude-skills', 'claude-skill', 'agent-skill', 'skill-md']
 
@@ -347,7 +355,7 @@ export class SkillMcpService extends TypertRemoteService {
     const headers: Record<string, string> = {
       accept: 'application/vnd.github+json',
       // GitHub rejects requests with no user agent outright.
-      'user-agent': 'dsh-skill-mcp',
+      'user-agent': 'dsh-skill-mcp-console',
     }
     if (process.env.DSM_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.DSM_GITHUB_TOKEN}`
 
@@ -388,7 +396,7 @@ export class SkillMcpService extends TypertRemoteService {
   async repoReadme(payload: string): Promise<string> {
     const { repo } = JSON.parse(payload) as { repo: string }
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error('expected owner/repo')
-    const headers: Record<string, string> = { accept: 'application/vnd.github.raw', 'user-agent': 'dsh-skill-mcp' }
+    const headers: Record<string, string> = { accept: 'application/vnd.github.raw', 'user-agent': 'dsh-skill-mcp-console' }
     if (process.env.DSM_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.DSM_GITHUB_TOKEN}`
     const response = await fetch(`https://api.github.com/repos/${repo}/readme`, { headers })
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)

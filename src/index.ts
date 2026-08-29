@@ -1,5 +1,5 @@
 /**
- * `dsh-skill-mcp` — Skills and MCP as two top-level Settings sections.
+ * `dsh-skill-mcp-console` — Skills and MCP as two top-level Settings sections.
  *
  * Why this exists, given how many capability panels the ecosystem already
  * has: every one measured before writing it fails at least one of these, and

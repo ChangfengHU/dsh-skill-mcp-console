@@ -1,4 +1,4 @@
-# dsh-skill-mcp
+# dsh-skill-mcp-console
 
 Skills and MCP as two **top-level** sections in DeepSeek Harness settings.
 
@@ -22,7 +22,7 @@ domain rather than `localhost`.
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-skill-mcp
+dsh plugin --profile web add dsh-skill-mcp-console
 ```
 
 Restart dsh. Two new entries appear in Settings: **Skills** and **MCP**.
@@ -119,7 +119,7 @@ the whole plugin tree fails to load.
 
 ```bash
 pnpm pack
-dsh plugin --profile web add ./dsh-skill-mcp-0.1.0.tgz
+dsh plugin --profile web add ./dsh-skill-mcp-console-1.0.0.tgz
 ```
 
 ## Licence
@@ -151,7 +151,7 @@ MIT
 ## 安装
 
 ```bash
-dsh plugin --profile web add dsh-skill-mcp
+dsh plugin --profile web add dsh-skill-mcp-console
 ```
 
 重启 dsh,设置里会多出 **Skills** 和 **MCP** 两项。

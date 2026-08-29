@@ -16,7 +16,7 @@
  * @module dsh-skill-mcp/client/styles
  */
 
-const STYLE_ID = 'dsh-skill-mcp-styles'
+const STYLE_ID = 'dsh-skill-mcp-console-styles'
 
 const CSS = `
 .dsm-root, .dsm-scrim {

@@ -26,7 +26,7 @@ export type { ConsoleLocaleKey }
 export const NS = 'settings.skillMcp'
 
 /** Matches the package name, the graph row id, and the bundle id. */
-export const name = 'dsh-skill-mcp'
+export const name = 'dsh-skill-mcp-console'
 
 /** `remote.skillMcp` appears once this plugin mounts its contribution. */
 export const inject = ['slots', 'locale', 'remote']

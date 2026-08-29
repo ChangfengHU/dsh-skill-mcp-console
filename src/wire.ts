@@ -15,7 +15,7 @@
 import { z } from 'zod'
 
 /** Package id, repeated in every descriptor id and in both Typert faces. */
-export const PKG = 'dsh-skill-mcp'
+export const PKG = 'dsh-skill-mcp-console'
 
 /** One JSON-string parameter. */
 function jsonParam(name: string) {
