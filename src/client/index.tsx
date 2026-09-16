@@ -10,16 +10,20 @@
  * @module dsh-skill-mcp/client
  */
 
-import type { DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
+import type { AppPreview, DirectoryEntry, InstallCandidate, InstallPlan, McpRow, SkillRow, SkillState, VerifyCheck } from '../wire.ts'
 import { McpSection, type McpApi } from './McpSection.tsx'
 import { SkillsSection, type SkillsApi } from './SkillsSection.tsx'
 import { en, zh, type ConsoleLocaleKey } from './locales.ts'
 import { CONSOLE_REMOTE, unwrap } from './remote.ts'
 import { installStyles } from './styles.ts'
 import { fill } from './ui.tsx'
+import { SkillMcpWorkbenchPage } from './WorkbenchPage.tsx'
+import { AppsSection, type AppsApi } from './AppsSection.tsx'
 
 export { SkillsSection } from './SkillsSection.tsx'
 export { McpSection } from './McpSection.tsx'
+export { SkillMcpWorkbenchPage } from './WorkbenchPage.tsx'
+export { AppsSection } from './AppsSection.tsx'
 export type { ConsoleLocaleKey }
 
 /** Dictionary namespace owned by this plugin. */
@@ -84,6 +88,15 @@ export async function apply(ctx: any): Promise<void> {
     setMcpDisabled: async (name_, disabled) => { await call('setMcpDisabled', { name: name_, disabled }) },
     setToolDisabled: async (server, tool, disabled) => { await call('setToolDisabled', { server, tool, disabled }) },
   }
+  const appsApi: AppsApi = {
+    inspectApp: input => call<AppPreview>('inspectApp', { input }),
+    installApp: previewId => call('installApp', { previewId }),
+  }
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section', id: 'skill-mcp-apps', order: 25, label: 'Apps', locale: NS,
+    inject: () => ({ api: appsApi }),
+  }, AppsSection))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
@@ -102,6 +115,14 @@ export async function apply(ctx: any): Promise<void> {
     locale: NS,
     inject: () => ({ api: mcpApi, t }),
   }, McpSection))
+
+  ctx.slots.inject('workbench.page', () => ctx.slots.register({
+    name: 'workbench.page',
+    id: 'skills-mcp',
+    order: 20,
+    label: 'Skills & MCP',
+    inject: () => ({ appsApi, skillsApi, mcpApi, t }),
+  }, SkillMcpWorkbenchPage))
 }
 
 /**

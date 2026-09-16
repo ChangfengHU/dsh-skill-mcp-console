@@ -48,6 +48,7 @@ export {
   cleanup, createSkill, detect, findSkills, peek, place, run, runShell, stage,
   uploadSkill, verify,
 } from './install.ts'
+export { AppInstaller, parseAppImport } from './apps.ts'
 export { estimateToolTokens, estimateTokens, formatTokens } from './tokens.ts'
 export { CONSOLE_INVOCATIONS, METHODS, PKG } from './wire.ts'
 export type {

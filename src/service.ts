@@ -28,6 +28,7 @@ import {
 import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.ts'
 import { estimateToolTokens } from './tokens.ts'
 import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wire.ts'
+import { AppInstaller } from './apps.ts'
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
@@ -74,6 +75,7 @@ export class SkillMcpService extends TypertRemoteService {
   /** Staged install directories, keyed by the token handed to the client. */
   private readonly staged = new Map<string, { dir: string; plan: ReturnType<typeof detect> }>()
   private stageSeq = 0
+  private readonly appInstaller = new AppInstaller()
 
   /**
    * The last scan, reused for a moment.
@@ -244,6 +246,18 @@ export class SkillMcpService extends TypertRemoteService {
   }
 
   // ── install ───────────────────────────────────────────────────────────
+
+  /** Parse a supported App command and return a secret-free package preview. */
+  async inspectApp(payload: string): Promise<string> {
+    const { input } = JSON.parse(payload) as { input: string }
+    return JSON.stringify(await this.appInstaller.inspect(input))
+  }
+
+  /** Install exactly the package bound to a recent server-side preview. */
+  async installApp(payload: string): Promise<string> {
+    const { previewId } = JSON.parse(payload) as { previewId: string }
+    return JSON.stringify(await this.appInstaller.install(previewId))
+  }
 
   /** Recognise what the user pasted. Runs nothing. */
   async detectInstall(payload: string): Promise<string> {

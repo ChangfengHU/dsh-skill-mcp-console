@@ -1,5 +1,21 @@
 # dsh-skill-mcp-console
 
+## Apps
+
+The **Apps** settings page installs an aggregate capability package (Skills,
+MCP declarations, instructions and Hooks) from a publisher-provided command.
+The first supported release format is:
+
+```text
+bash <(curl -fsSL https://skill.vyibc.com/<app>/release/install-<app>.sh) --bootstrap-token <one-time-token>
+```
+
+Import is deliberately two-phase. The host parses the command without a
+shell, reads the installer and repository manifests, and returns a
+secret-free preview. Installation only starts after explicit confirmation,
+using the short-lived server-side preview id. Unknown hosts, extra shell
+operators and installer/manifest mismatches are rejected.
+
 Skills and MCP as two **top-level** sections in DeepSeek Harness settings.
 
 中文说明在下方。

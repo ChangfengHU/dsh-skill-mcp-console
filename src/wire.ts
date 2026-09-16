@@ -49,8 +49,16 @@ export const METHODS = [
   ['mcp', 0], ['mcpJson', 0], ['saveMcpJson', 1], ['setMcpDisabled', 1], ['setToolDisabled', 1],
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
-  
+  ['inspectApp', 1], ['installApp', 1],
 ] as const
+
+export interface AppPart { name: string; description?: string }
+export interface AppPreview {
+  previewId: string; expiresAt: number; name: string; displayName: string; version: string
+  description: string; publisher: string; source: string; revision: string; installer: string
+  skills: AppPart[]; mcpServers: AppPart[]; commands: AppPart[]; hooks: AppPart[]
+  permissions: string[]; installed: boolean
+}
 
 /** The canonical invocation list. Both faces register exactly this. */
 export const CONSOLE_INVOCATIONS = Object.freeze(METHODS.map(([method, argc]) => descriptor(method, argc)))
