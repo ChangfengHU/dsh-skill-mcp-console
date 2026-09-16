@@ -10,9 +10,11 @@
 - App preview reads and pins the public GitHub release commit, exposes package
   contents without returning the bootstrap credential, and keeps confirmation
   state in host memory for ten minutes.
-- Production profile `web` loads package version 1.2.0. Apps includes a
+- Production profile `web` loads package version 1.2.1. Apps includes a
   catalog, six-tab detail view, live Skill/MCP state, lifecycle management and
   a fill-current-session action.
+- App command discovery follows the package's `command-support/catalog.json`
+  contract; the first real package exposes nine command entries.
 
 ## Next action
 

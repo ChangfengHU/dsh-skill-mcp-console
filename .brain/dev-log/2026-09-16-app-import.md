@@ -8,6 +8,14 @@
 - Catalog rendering is local and immediate; a fresh signed import remains the
   authority for exact release contents and credentials remain host-memory only.
 
+## 1.2.1 preview fidelity
+
+- Parse the publisher's real `command-support/catalog.json` instead of only
+  guessing `commands/` and `instructions/` directory conventions.
+- Show expandable Skills, MCP, commands and Hooks with command descriptions in
+  the confirmation dialog. Browser acceptance verified 29/8/9/0 and confirmed
+  that the submitted credential is absent from the DOM.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome

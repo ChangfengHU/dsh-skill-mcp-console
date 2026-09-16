@@ -125,7 +125,11 @@ export class AppInstaller {
       .map(item => ({ path: item.path.slice(prefix.length), size: item.size ?? 0 }))
     const paths = files.map(item => item.path)
     const skillNames = [...new Set(paths.flatMap(path => /^skills\/([^/]+)\/SKILL\.md$/.exec(path)?.[1] ?? []))].sort()
-    const commandNames = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
+    let commands: AppPart[] = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort().map(name => ({ name }))
+    if (paths.includes('command-support/catalog.json')) {
+      const catalog = await githubJson<{ commands?: { name?: string; description?: string }[] }>(`${rawBase}/plugins/${contract.plugin}/command-support/catalog.json`)
+      commands = (catalog.commands ?? []).filter(item => item.name).map(item => ({ name: item.name!, description: item.description }))
+    }
     const hookNames = [...new Set(paths.flatMap(path => /^hooks\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
     const receipt = await this.readReceipt(contract.plugin)
     const preview = publicPreview({
@@ -139,7 +143,7 @@ export class AppInstaller {
       installer: parsed.installer,
       skills: skillNames.map(name => ({ name })),
       mcpServers: contract.servers.map(name => ({ name })),
-      commands: commandNames.map(name => ({ name })),
+      commands,
       hooks: hookNames.map(name => ({ name })),
       permissions: Array.isArray(manifest.interface?.capabilities) ? manifest.interface.capabilities : [],
       installed: Boolean(receipt),
@@ -162,6 +166,7 @@ export class AppInstaller {
     const receipt = await this.readReceipt('cartoon-video-studio')
     const names = ['cartoon-hongyi','cartoon-video-studio','cartoon-xiaban','general-video','hyperframes-animation','hyperframes-audio','hyperframes-cli','hyperframes-core','hyperframes-creative','hyperframes-keyframes','hyperframes-registry','hyperframes','media-use','studio-ali','studio-character-workflow','studio-check','studio-director','studio-help','studio-hongyi','studio-materials','studio-music','studio-new','studio-publish','studio-quality','studio-revise','studio-xiabanxiaoren','studio','voice-production','vyibc-character-design']
     const servers = ['vyibc-cartoon-assets','vyibc-image','vyibc-douyin','vyibc-youtube','vyibc-voice','vyibc-behavior','vyibc-xiaohongshu','vyibc-vault']
+    const commands = ['studio','studio-xiabanxiaoren','studio-hongyi','studio-ali','studio-new','studio-help','studio-revise','studio-check','studio-publish']
     return [{
       previewId: '', expiresAt: 0, name: 'cartoon-video-studio', displayName: '卡通视频工作室',
       version: receipt?.version ?? '0.7.2', installedVersion: receipt?.version ?? null,
@@ -169,7 +174,7 @@ export class AppInstaller {
       publisher: 'ChangfengHU', source: 'github.com/ChangfengHU/cartoon-video-skills',
       revision: receipt?.revision ?? 'main', installer: `https://${INSTALLER_HOST}/cartoon-video-studio/release/install-cartoon-video-studio.sh`,
       skills: (receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
-      commands: [], hooks: [], permissions: [], installed: Boolean(receipt), enabled: receipt?.enabled !== false,
+      commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt), enabled: receipt?.enabled !== false,
       updateAvailable: false,
     }]
   }
