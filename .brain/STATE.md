@@ -10,7 +10,7 @@
 - App preview reads and pins the public GitHub release commit, exposes package
   contents without returning the bootstrap credential, and keeps confirmation
   state in host memory for ten minutes.
-- Production profile `web` loads package version 1.5.1. Apps includes a
+- Production profile `web` loads package version 1.5.2. Apps includes a
   catalog, six-tab detail view, live Skill/MCP state, lifecycle management and
   a fill-current-session action.
 - App command discovery follows the package's `command-support/catalog.json`
@@ -26,9 +26,14 @@
 - Independent same-name Skills are preserved and reused instead of aborting the
   whole App. Receipts separately track declared Skills and App-owned Skills so
   lifecycle actions never modify reused environment capabilities.
+- Skill installation reports per-Skill progress instead of remaining at zero
+  for the entire download. DSH MCP acceptance uses each effective configured
+  endpoint and is independent of optional Codex Plugin CLI support.
+- `cartoon-video-studio` 0.7.2 is installed: 28 App-managed Skills, one reused
+  independent Skill, and all eight declared MCPs passed initialize and
+  `tools/list` acceptance through the signed bridge.
 
 ## Next action
 
-Have the user paste a fresh command into Settings → Apps and confirm the real
-install. Verify Codex reports the App enabled and each declared MCP connection
-passes its post-install check.
+Expose the already collected MCP tool names and descriptions in an expandable
+App detail row if the owner wants deeper capability inspection.

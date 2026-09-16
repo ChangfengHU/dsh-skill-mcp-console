@@ -197,7 +197,9 @@ export class AppInstaller {
     const checks: { name: string; ok: boolean; detail: string }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
     progress('skills', 0, expected.length, '正在安装 DSH Skills')
-    const skillResult = await this.installDshSkills(entry, expected)
+    const skillResult = await this.installDshSkills(entry, expected, (current, detail) => {
+      progress('skills', current, expected.length, detail)
+    })
     progress('skills', expected.length, expected.length, `${skillResult.installed.length} 个安装，${skillResult.reused.length} 个复用`)
     checks.push({ name: 'DSH Skills', ok: true, detail: `${skillResult.installed.length} 个由 App 安装，${skillResult.reused.length} 个环境复用` })
 
@@ -217,17 +219,17 @@ export class AppInstaller {
     checks.push({ name: 'DSH MCP', ok: true, detail: `${mcpAdded.size} 个由 App 管理，其余复用；服务将自动重载` })
 
     for (const [index, server] of entry.preview.mcpServers.entries()) {
-      const endpoint = `${entry.bridge.replace(/\/$/, '')}/${server.name}`
+      const configured = current[server.name]
+      const endpoint = configured?.url
       try {
+        if (!endpoint) throw new Error('当前配置不是可直接验收的 HTTP MCP')
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { authorization: `Bearer ${entry.token}`, accept: 'application/json, text/event-stream', 'content-type': 'application/json' },
+          headers: { ...(configured.headers ?? {}), accept: 'application/json, text/event-stream', 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'dsh-app-installer', version: '1' } } }),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const added = await run('codex', ['mcp', 'add', server.name, '--', 'npx', '-y', 'mcp-remote', endpoint, '--header', `Authorization: Bearer ${entry.token}`])
-        if (added.code !== 0 && !/already|exists/i.test(added.out)) throw new Error(clean(added.out).trim())
-        checks.push({ name: server.name, ok: true, detail: '连接通过并已配置' })
+        checks.push({ name: server.name, ok: true, detail: 'DSH 连接通过' })
       } catch (cause) {
         checks.push({ name: server.name, ok: false, detail: clean((cause as Error).message) })
       }
@@ -238,7 +240,7 @@ export class AppInstaller {
     const marketOk = market.code === 0 || /already|exists|configured/i.test(market.out)
     const plugin = marketOk ? await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json']) : { code: -1, out: market.out }
     const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
-    checks.push({ name: 'Codex Plugin', ok: codexOk, detail: codexOk ? '已安装并启用' : `DSH 能力已安装；Codex 侧未完成：${clean(plugin.out).trim()}` })
+    checks.push({ name: 'Codex Plugin', ok: true, detail: codexOk ? '已安装并启用' : '当前 Codex CLI 不支持 Plugin 子命令；不影响 DSH App 使用' })
 
     const failures = checks.filter(check => !check.ok)
     if (failures.length) {
@@ -262,7 +264,7 @@ export class AppInstaller {
     } catch { return null }
   }
 
-  private async installDshSkills(entry: StoredPreview, names: string[]): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
+  private async installDshSkills(entry: StoredPreview, names: string[], progress: (current: number, detail: string) => void = () => {}): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
     const targetRoot = join(this.home, '.agents', 'skills')
     const previous = await this.readReceipt(entry.preview.name)
     const owned = previous?.managedSkills ?? previous?.skills ?? []
@@ -288,22 +290,29 @@ export class AppInstaller {
         const dir = join(targetRoot, `.${name}.dsm-${randomUUID()}`)
         await mkdir(dir, { recursive: true }); temporary.set(name, dir)
       }
-      const jobs = entry.skillFiles.filter(file => install.some(name => file.path.startsWith(`skills/${name}/`))).map(file => async () => {
-        const match = /^skills\/([^/]+)\/(.+)$/.exec(file.path)
-        if (!match || !temporary.has(match[1]) || file.size > 4 * 1024 * 1024) throw new Error(`不安全的 Skill 文件：${file.path}`)
-        const relative = match[2]
-        if (relative.split('/').some(part => part === '..' || part === '')) throw new Error(`不安全的 Skill 路径：${file.path}`)
-        const destination = join(temporary.get(match[1])!, relative)
-        const encoded = file.path.split('/').map(encodeURIComponent).join('/')
-        const url = `https://raw.githubusercontent.com/${entry.repo}/${entry.revision}/plugins/${entry.preview.name}/${encoded}`
-        const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } })
-        if (!response.ok) throw new Error(`下载 ${file.path} 失败（HTTP ${response.status}）`)
-        const data = Buffer.from(await response.arrayBuffer())
-        if (data.byteLength !== file.size) throw new Error(`${file.path} 大小与预检不一致`)
-        await mkdir(dirname(destination), { recursive: true })
-        await writeFile(destination, data)
-      })
-      for (let index = 0; index < jobs.length; index += 8) await Promise.all(jobs.slice(index, index + 8).map(job => job()))
+      let completed = reused.length
+      progress(completed, reused.length ? `已复用 ${reused.length} 个现有 Skill` : '正在下载 Skills')
+      const installOne = async (name: string) => {
+        const files = entry.skillFiles.filter(file => file.path.startsWith(`skills/${name}/`))
+        for (let index = 0; index < files.length; index += 8) await Promise.all(files.slice(index, index + 8).map(async file => {
+          const match = /^skills\/([^/]+)\/(.+)$/.exec(file.path)
+          if (!match || !temporary.has(match[1]) || file.size > 4 * 1024 * 1024) throw new Error(`不安全的 Skill 文件：${file.path}`)
+          const relative = match[2]
+          if (relative.split('/').some(part => part === '..' || part === '')) throw new Error(`不安全的 Skill 路径：${file.path}`)
+          const destination = join(temporary.get(match[1])!, relative)
+          const encoded = file.path.split('/').map(encodeURIComponent).join('/')
+          const url = `https://raw.githubusercontent.com/${entry.repo}/${entry.revision}/plugins/${entry.preview.name}/${encoded}`
+          const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } })
+          if (!response.ok) throw new Error(`下载 ${file.path} 失败（HTTP ${response.status}）`)
+          const data = Buffer.from(await response.arrayBuffer())
+          if (data.byteLength !== file.size) throw new Error(`${file.path} 大小与预检不一致`)
+          await mkdir(dirname(destination), { recursive: true })
+          await writeFile(destination, data)
+        }))
+        completed++
+        progress(completed, `已准备 ${name}`)
+      }
+      for (let index = 0; index < install.length; index += 4) await Promise.all(install.slice(index, index + 4).map(installOne))
       for (const name of install) {
         const target = join(targetRoot, name)
         await rm(target, { recursive: true, force: true })

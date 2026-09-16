@@ -84,3 +84,17 @@ Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 The final real install remains a user confirmation step in the UI because the
 credential must not be copied into terminal history or development logs.
+## 1.5.2 real install recovery
+
+- Fixed Skill installation progress so every completed Skill advances the
+  visible numerator; reused independent Skills count immediately.
+- MCP acceptance now probes the effective DSH configuration. Optional Codex
+  Plugin CLI support is reported separately and cannot turn a usable DSH App
+  into a failed install.
+- Deployed the corresponding Fleet bridge correction and verified all eight
+  declared MCPs with both initialize and `tools/list` (83 tools total).
+- Recovered the retained 0.7.2 install without asking for another bootstrap
+  credential: 28 managed Skills, one reused Skill, eight connected MCPs.
+- `npm test`, build, package install, DSH restart, public browser load and the
+  persisted installed receipt all passed. No credential entered source, logs,
+  browser responses or Git.
