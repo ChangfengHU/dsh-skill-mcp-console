@@ -91,7 +91,8 @@ export async function apply(ctx: any): Promise<void> {
   const appsApi: AppsApi = {
     apps: () => call<AppPreview[]>('apps'),
     inspectApp: input => call<AppPreview>('inspectApp', { input }),
-    installApp: previewId => call('installApp', { previewId }),
+    startAppInstall: previewId => call('startAppInstall', { previewId }),
+    appInstallStatus: jobId => call('appInstallStatus', { jobId }),
     setAppEnabled: async (name_, enabled) => { await call('setAppEnabled', { name: name_, enabled }) },
     uninstallApp: name_ => call('uninstallApp', { name: name_ }),
     skills: () => call<SkillRow[]>('skills'),

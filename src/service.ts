@@ -14,6 +14,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -76,6 +77,7 @@ export class SkillMcpService extends TypertRemoteService {
   private readonly staged = new Map<string, { dir: string; plan: ReturnType<typeof detect> }>()
   private stageSeq = 0
   private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
+  private readonly appJobs = new Map<string, { state: 'running' | 'done' | 'failed'; stage: string; current: number; total: number; detail: string; result?: unknown; error?: string }>()
 
   /**
    * The last scan, reused for a moment.
@@ -263,6 +265,26 @@ export class SkillMcpService extends TypertRemoteService {
     // newly installed capabilities instead of reporting success for stale state.
     this.reloadHost()
     return JSON.stringify(result)
+  }
+
+  /** Start a long App install without holding one browser RPC open. */
+  async startAppInstall(payload: string): Promise<string> {
+    const { previewId } = JSON.parse(payload) as { previewId: string }
+    const jobId = randomUUID()
+    const job = { state: 'running' as const, stage: 'starting', current: 0, total: 1, detail: '正在准备安装' }
+    this.appJobs.set(jobId, job)
+    void this.appInstaller.install(previewId, (stage, current, total, detail) => Object.assign(job, { stage, current, total, detail }))
+      .then(result => { this.appJobs.set(jobId, { ...job, state: 'done', stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }); this.invalidate() })
+      .catch(cause => { this.appJobs.set(jobId, { ...job, state: 'failed', error: (cause as Error).message, detail: '安装失败' }) })
+    return JSON.stringify({ jobId })
+  }
+
+  async appInstallStatus(payload: string): Promise<string> {
+    const { jobId } = JSON.parse(payload) as { jobId: string }
+    const job = this.appJobs.get(jobId)
+    if (!job) throw new Error('安装任务不存在或服务已重启')
+    if (job.state !== 'running') setTimeout(() => this.appJobs.delete(jobId), 60_000)
+    return JSON.stringify(job)
   }
 
   /** Available and installed Apps with live release metadata. */

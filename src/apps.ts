@@ -179,7 +179,7 @@ export class AppInstaller {
     }]
   }
 
-  async install(previewId: string): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
+  async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
     this.prune()
     const entry = this.previews.get(previewId)
     if (!entry) throw new Error('预检已过期，请重新粘贴安装命令')
@@ -187,7 +187,9 @@ export class AppInstaller {
     const clean = (value: string) => value.replaceAll(entry.token, '••••')
     const checks: { name: string; ok: boolean; detail: string }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
+    progress('skills', 0, expected.length, '正在安装 DSH Skills')
     await this.installDshSkills(entry, expected)
+    progress('skills', expected.length, expected.length, `${expected.length} 个 Skills 已落地`)
     checks.push({ name: 'DSH Skills', ok: true, detail: `${expected.length} 个已安装到原生能力目录` })
 
     const current = await toUniversal(this.patch, false)
@@ -202,9 +204,10 @@ export class AppInstaller {
       mcpAdded.add(server.name)
     }
     await fromUniversal(this.patch, current)
+    progress('mcp', 0, entry.preview.mcpServers.length, 'MCP 配置已写入，正在逐项验收')
     checks.push({ name: 'DSH MCP', ok: true, detail: `${mcpAdded.size} 个由 App 管理，其余复用；服务将自动重载` })
 
-    for (const server of entry.preview.mcpServers) {
+    for (const [index, server] of entry.preview.mcpServers.entries()) {
       const endpoint = `${entry.bridge.replace(/\/$/, '')}/${server.name}`
       try {
         const response = await fetch(endpoint, {
@@ -219,7 +222,9 @@ export class AppInstaller {
       } catch (cause) {
         checks.push({ name: server.name, ok: false, detail: clean((cause as Error).message) })
       }
+      progress('mcp', index + 1, entry.preview.mcpServers.length, `已检查 ${server.name}`)
     }
+    progress('codex', 0, 1, '正在登记 Codex App')
     const market = await run('codex', ['plugin', 'marketplace', 'add', entry.repo, '--ref', entry.revision, '--json'])
     const marketOk = market.code === 0 || /already|exists|configured/i.test(market.out)
     const plugin = marketOk ? await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json']) : { code: -1, out: market.out }
@@ -229,6 +234,7 @@ export class AppInstaller {
     await this.writeReceipt(entry, [...mcpAdded])
     const installed = Boolean(await this.readReceipt(entry.preview.name))
     checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
+    progress('complete', 1, 1, '安装与验收完成')
     return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false }, checks }
   }
 

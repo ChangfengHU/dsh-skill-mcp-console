@@ -16,6 +16,15 @@
   the confirmation dialog. Browser acceptance verified 29/8/9/0 and confirmed
   that the submitted credential is absent from the DOM.
 
+## 1.3.0 observable installation
+
+- Replaced the long blocking browser RPC with a background host job and status
+  polling, exposing actual Skill and per-MCP progress in the confirmation UI.
+- Corrected MCP state labels: configured, disabled, runtime phase and actual
+  registered tool counts are separate facts; missing entries say unconfigured.
+- Diagnosis of the first user attempt found no receipt, no installed Skills and
+  seven missing MCP entries, proving that attempt did not complete.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome
