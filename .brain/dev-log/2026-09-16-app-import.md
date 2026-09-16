@@ -13,6 +13,11 @@ Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
   neither returned to the browser nor included in logs or repository files.
 - Installation uses structured `codex` argv calls and probes each declared MCP;
   it never evaluates the pasted command.
+- The same package is adapted into DSH-native capability storage: Skills are
+  installed under the native user root, MCP entries are merged into the active
+  profile, and an ownership receipt prevents overwriting independent Skills.
+  The loader exits only after returning the result so the supervised host can
+  restart with the new registry.
 
 ## Verification
 

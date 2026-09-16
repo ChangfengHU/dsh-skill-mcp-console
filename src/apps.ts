@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { run } from './install.ts'
+import { fromUniversal, toUniversal } from './mcpconfig.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -26,7 +30,10 @@ export interface AppPreview {
 }
 
 interface ParsedImport { slug: string; installer: string; token: string }
-interface StoredPreview { expiresAt: number; token: string; preview: AppPreview; repo: string; marketplace: string; bridge: string; revision: string }
+interface StoredPreview {
+  expiresAt: number; token: string; preview: AppPreview; repo: string; marketplace: string; bridge: string; revision: string
+  skillFiles: { path: string; size: number }[]
+}
 
 function safeUrl(value: string): URL {
   const url = new URL(value)
@@ -84,6 +91,13 @@ function publicPreview(value: Omit<AppPreview, 'previewId' | 'expiresAt'>): AppP
 
 export class AppInstaller {
   private previews = new Map<string, StoredPreview>()
+  private readonly home: string
+  private readonly patch: string
+
+  constructor(home = homedir(), patch = join(home, '.dsh', 'profiles', 'web', 'cordis.patch.yml')) {
+    this.home = home
+    this.patch = patch
+  }
 
   async inspect(input: string): Promise<AppPreview> {
     const parsed = parseAppImport(input)
@@ -96,9 +110,11 @@ export class AppInstaller {
     const manifestPath = `plugins/${contract.plugin}/.codex-plugin/plugin.json`
     const manifest = await githubJson<any>(`${rawBase}/${manifestPath}`)
     if (manifest.name !== contract.plugin || typeof manifest.version !== 'string') throw new Error('App manifest 与安装器声明不一致')
-    const tree = await githubJson<{ tree?: { path: string; type: string }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
+    const tree = await githubJson<{ tree?: { path: string; type: string; size?: number }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
     const prefix = `plugins/${contract.plugin}/`
-    const paths = (tree.tree ?? []).filter(item => item.type === 'blob' && item.path.startsWith(prefix)).map(item => item.path.slice(prefix.length))
+    const files = (tree.tree ?? []).filter(item => item.type === 'blob' && item.path.startsWith(prefix))
+      .map(item => ({ path: item.path.slice(prefix.length), size: item.size ?? 0 }))
+    const paths = files.map(item => item.path)
     const skillNames = [...new Set(paths.flatMap(path => /^skills\/([^/]+)\/SKILL\.md$/.exec(path)?.[1] ?? []))].sort()
     const commandNames = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
     const hookNames = [...new Set(paths.flatMap(path => /^hooks\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
@@ -116,10 +132,13 @@ export class AppInstaller {
       commands: commandNames.map(name => ({ name })),
       hooks: hookNames.map(name => ({ name })),
       permissions: Array.isArray(manifest.interface?.capabilities) ? manifest.interface.capabilities : [],
-      installed: await isInstalled(contract.plugin, contract.marketplace),
+      installed: await this.isDshInstalled(contract.plugin, revision),
     })
     this.prune()
-    this.previews.set(preview.previewId, { expiresAt: preview.expiresAt, token: parsed.token, preview, revision, ...contract })
+    this.previews.set(preview.previewId, {
+      expiresAt: preview.expiresAt, token: parsed.token, preview, revision,
+      skillFiles: files.filter(item => item.path.startsWith('skills/')), ...contract,
+    })
     return preview
   }
 
@@ -129,12 +148,19 @@ export class AppInstaller {
     if (!entry) throw new Error('预检已过期，请重新粘贴安装命令')
     this.previews.delete(previewId)
     const clean = (value: string) => value.replaceAll(entry.token, '••••')
-    const market = await run('codex', ['plugin', 'marketplace', 'add', entry.repo, '--ref', entry.revision, '--json'])
-    if (market.code !== 0 && !/already|exists|configured/i.test(market.out)) throw new Error(`Marketplace 安装失败：${clean(market.out).trim()}`)
-    const plugin = await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json'])
-    if (plugin.code !== 0) throw new Error(`App 安装失败：${clean(plugin.out).trim()}`)
-
     const checks: { name: string; ok: boolean; detail: string }[] = []
+    const expected = entry.preview.skills.map(item => item.name).sort()
+    await this.installDshSkills(entry, expected)
+    checks.push({ name: 'DSH Skills', ok: true, detail: `${expected.length} 个已安装到原生能力目录` })
+
+    const current = await toUniversal(this.patch, false)
+    for (const server of entry.preview.mcpServers) current[server.name] = {
+      type: 'http', url: `${entry.bridge.replace(/\/$/, '')}/${server.name}`,
+      headers: { Authorization: `Bearer ${entry.token}` }, failOnStartupError: false,
+    }
+    await fromUniversal(this.patch, current)
+    checks.push({ name: 'DSH MCP', ok: true, detail: `${entry.preview.mcpServers.length} 个连接已写入当前 Profile，服务将自动重载` })
+
     for (const server of entry.preview.mcpServers) {
       const endpoint = `${entry.bridge.replace(/\/$/, '')}/${server.name}`
       try {
@@ -151,9 +177,86 @@ export class AppInstaller {
         checks.push({ name: server.name, ok: false, detail: clean((cause as Error).message) })
       }
     }
-    const installed = await isInstalled(entry.preview.name, entry.marketplace)
-    checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version}` : 'Codex 未报告为已安装' })
+    const market = await run('codex', ['plugin', 'marketplace', 'add', entry.repo, '--ref', entry.revision, '--json'])
+    const marketOk = market.code === 0 || /already|exists|configured/i.test(market.out)
+    const plugin = marketOk ? await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json']) : { code: -1, out: market.out }
+    const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
+    checks.push({ name: 'Codex Plugin', ok: codexOk, detail: codexOk ? '已安装并启用' : `DSH 能力已安装；Codex 侧未完成：${clean(plugin.out).trim()}` })
+
+    await this.writeReceipt(entry)
+    const installed = await this.isDshInstalled(entry.preview.name, entry.revision)
+    checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
     return { app: { ...entry.preview, installed }, checks }
+  }
+
+  private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
+
+  private async isDshInstalled(name: string, revision: string): Promise<boolean> {
+    try {
+      const record = JSON.parse(await readFile(this.receiptFile(name), 'utf8')) as { revision?: string }
+      return record.revision === revision
+    } catch { return false }
+  }
+
+  private async installDshSkills(entry: StoredPreview, names: string[]) {
+    const targetRoot = join(this.home, '.agents', 'skills')
+    let owned: string[] = []
+    try { owned = (JSON.parse(await readFile(this.receiptFile(entry.preview.name), 'utf8')) as { skills?: string[] }).skills ?? [] } catch {}
+    for (const name of names) {
+      const target = join(targetRoot, name)
+      try {
+        await access(target)
+        if (!owned.includes(name)) throw new Error(`Skill ${name} 已独立安装；为避免覆盖，App 安装已停止`)
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
+      }
+    }
+    await mkdir(targetRoot, { recursive: true })
+    const total = entry.skillFiles.reduce((sum, file) => sum + file.size, 0)
+    if (total > 40 * 1024 * 1024) throw new Error('App Skills 总大小超过 40 MB 限制')
+    const temporary = new Map<string, string>()
+    try {
+      for (const name of names) {
+        const dir = join(targetRoot, `.${name}.dsm-${randomUUID()}`)
+        await mkdir(dir, { recursive: true }); temporary.set(name, dir)
+      }
+      const jobs = entry.skillFiles.map(file => async () => {
+        const match = /^skills\/([^/]+)\/(.+)$/.exec(file.path)
+        if (!match || !temporary.has(match[1]) || file.size > 4 * 1024 * 1024) throw new Error(`不安全的 Skill 文件：${file.path}`)
+        const relative = match[2]
+        if (relative.split('/').some(part => part === '..' || part === '')) throw new Error(`不安全的 Skill 路径：${file.path}`)
+        const destination = join(temporary.get(match[1])!, relative)
+        const encoded = file.path.split('/').map(encodeURIComponent).join('/')
+        const url = `https://raw.githubusercontent.com/${entry.repo}/${entry.revision}/plugins/${entry.preview.name}/${encoded}`
+        const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } })
+        if (!response.ok) throw new Error(`下载 ${file.path} 失败（HTTP ${response.status}）`)
+        const data = Buffer.from(await response.arrayBuffer())
+        if (data.byteLength !== file.size) throw new Error(`${file.path} 大小与预检不一致`)
+        await mkdir(dirname(destination), { recursive: true })
+        await writeFile(destination, data)
+      })
+      for (let index = 0; index < jobs.length; index += 8) await Promise.all(jobs.slice(index, index + 8).map(job => job()))
+      for (const name of names) {
+        const target = join(targetRoot, name)
+        await rm(target, { recursive: true, force: true })
+        await rename(temporary.get(name)!, target)
+        temporary.delete(name)
+      }
+    } finally {
+      for (const dir of temporary.values()) await rm(dir, { recursive: true, force: true }).catch(() => {})
+    }
+  }
+
+  private async writeReceipt(entry: StoredPreview) {
+    const file = this.receiptFile(entry.preview.name)
+    await mkdir(dirname(file), { recursive: true })
+    const temporary = `${file}.${randomUUID()}.tmp`
+    await writeFile(temporary, JSON.stringify({
+      schema: 1, name: entry.preview.name, version: entry.preview.version, revision: entry.revision,
+      source: entry.repo, skills: entry.preview.skills.map(item => item.name),
+      mcpServers: entry.preview.mcpServers.map(item => item.name), installedAt: new Date().toISOString(),
+    }, null, 2) + '\n', { mode: 0o600 })
+    await rename(temporary, file)
   }
 
   private prune() {

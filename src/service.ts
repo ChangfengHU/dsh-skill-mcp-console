@@ -75,7 +75,7 @@ export class SkillMcpService extends TypertRemoteService {
   /** Staged install directories, keyed by the token handed to the client. */
   private readonly staged = new Map<string, { dir: string; plan: ReturnType<typeof detect> }>()
   private stageSeq = 0
-  private readonly appInstaller = new AppInstaller()
+  private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
 
   /**
    * The last scan, reused for a moment.
@@ -256,7 +256,13 @@ export class SkillMcpService extends TypertRemoteService {
   /** Install exactly the package bound to a recent server-side preview. */
   async installApp(payload: string): Promise<string> {
     const { previewId } = JSON.parse(payload) as { previewId: string }
-    return JSON.stringify(await this.appInstaller.install(previewId))
+    const result = await this.appInstaller.install(previewId)
+    this.invalidate()
+    // The patch layer and native skill registry are read at boot. Exit only
+    // after the response has left; the supervised service comes back with the
+    // newly installed capabilities instead of reporting success for stale state.
+    setTimeout(() => { try { (this.ctx.loader as { exit?: () => void }).exit?.() } catch {} }, 750)
+    return JSON.stringify(result)
   }
 
   /** Recognise what the user pasted. Runs nothing. */

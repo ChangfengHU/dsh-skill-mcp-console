@@ -55,7 +55,7 @@ export function run(command: string, args: string[], cwd?: string): Promise<{ co
 
 /** Fetch a URL as text, bounded. */
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { redirect: 'follow' })
+  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(STEP_TIMEOUT_MS) })
   if (!response.ok) throw new Error(`${response.status} ${response.statusText} — ${url}`)
   const text = await response.text()
   if (text.length > MAX_FETCH_BYTES) throw new Error('response too large')
@@ -64,7 +64,7 @@ async function fetchText(url: string): Promise<string> {
 
 /** Fetch a URL into a file, bounded. */
 async function fetchFile(url: string, dest: string): Promise<number> {
-  const response = await fetch(url, { redirect: 'follow' })
+  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(STEP_TIMEOUT_MS) })
   if (!response.ok) throw new Error(`${response.status} ${response.statusText} — ${url}`)
   const buffer = Buffer.from(await response.arrayBuffer())
   if (buffer.byteLength > MAX_FETCH_BYTES) throw new Error('response too large')
@@ -184,6 +184,16 @@ export async function findSkills(root: string, depth = 4, limit = 300, repoName 
  */
 export async function stage(plan: InstallPlan): Promise<{ dir: string; candidates: InstallCandidate[]; log: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'dsm-install-'))
+  try {
+    return await stageInto(plan, dir)
+  } catch (cause) {
+    await cleanup(dir)
+    throw cause
+  }
+}
+
+/** Stage into an already-owned temporary directory; the wrapper cleans failures. */
+async function stageInto(plan: InstallPlan, dir: string): Promise<{ dir: string; candidates: InstallCandidate[]; log: string }> {
   let log = ''
 
   if (plan.kind === 'github') {

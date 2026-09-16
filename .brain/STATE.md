@@ -10,7 +10,7 @@
 - App preview reads and pins the public GitHub release commit, exposes package
   contents without returning the bootstrap credential, and keeps confirmation
   state in host memory for ten minutes.
-- Production profile `web` currently loads package version 1.1.2.
+- Production profile `web` currently loads package version 1.1.3.
 
 ## Next action
 

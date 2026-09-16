@@ -16,6 +16,12 @@ secret-free preview. Installation only starts after explicit confirmation,
 using the short-lived server-side preview id. Unknown hosts, extra shell
 operators and installer/manifest mismatches are rejected.
 
+Confirmed Apps are adapted into DSH as well as Codex: Skills land in DSH's
+native user skill root, MCP connections are merged into the active profile,
+and an ownership receipt under `~/.dsh/apps/` prevents later updates from
+overwriting independently installed Skills. The supervised DSH process is
+then reloaded so a new session sees the installed capabilities.
+
 Skills and MCP as two **top-level** sections in DeepSeek Harness settings.
 
 中文说明在下方。
