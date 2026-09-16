@@ -59,6 +59,7 @@ export interface AppPreview {
   skills: AppPart[]; mcpServers: AppPart[]; commands: AppPart[]; hooks: AppPart[]
   permissions: string[]; installed: boolean; installedVersion: string | null
   enabled: boolean; updateAvailable: boolean
+  managedMcp: string[]
 }
 
 /** The canonical invocation list. Both faces register exactly this. */

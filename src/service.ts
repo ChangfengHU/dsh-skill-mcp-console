@@ -15,7 +15,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -78,6 +78,11 @@ export class SkillMcpService extends TypertRemoteService {
   private stageSeq = 0
   private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
   private readonly appJobs = new Map<string, { state: 'running' | 'done' | 'failed'; stage: string; current: number; total: number; detail: string; result?: unknown; error?: string }>()
+  private appJobFile(jobId: string): string { return join(homedir(), '.dsh', 'app-jobs', `${jobId}.json`) }
+  private async saveAppJob(jobId: string, job: unknown): Promise<void> {
+    const file = this.appJobFile(jobId); await mkdir(join(homedir(), '.dsh', 'app-jobs'), { recursive: true })
+    await writeFile(file, JSON.stringify(job, null, 2) + '\n', { mode: 0o600 })
+  }
 
   /**
    * The last scan, reused for a moment.
@@ -273,15 +278,18 @@ export class SkillMcpService extends TypertRemoteService {
     const jobId = randomUUID()
     const job = { state: 'running' as const, stage: 'starting', current: 0, total: 1, detail: '正在准备安装' }
     this.appJobs.set(jobId, job)
-    void this.appInstaller.install(previewId, (stage, current, total, detail) => Object.assign(job, { stage, current, total, detail }))
-      .then(result => { this.appJobs.set(jobId, { ...job, state: 'done', stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }); this.invalidate() })
-      .catch(cause => { this.appJobs.set(jobId, { ...job, state: 'failed', error: (cause as Error).message, detail: '安装失败' }) })
+    await this.saveAppJob(jobId, job)
+    void this.appInstaller.install(previewId, (stage, current, total, detail) => { Object.assign(job, { stage, current, total, detail }); void this.saveAppJob(jobId, job) })
+      .then(async result => { const done = { ...job, state: 'done' as const, stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }; this.appJobs.set(jobId, done); await this.saveAppJob(jobId, done); this.invalidate() })
+      .catch(async cause => { const failed = { ...job, state: 'failed' as const, error: (cause as Error).message, detail: '安装失败' }; this.appJobs.set(jobId, failed); await this.saveAppJob(jobId, failed) })
     return JSON.stringify({ jobId })
   }
 
   async appInstallStatus(payload: string): Promise<string> {
     const { jobId } = JSON.parse(payload) as { jobId: string }
-    const job = this.appJobs.get(jobId)
+    if (!/^[0-9a-f-]{36}$/.test(jobId)) throw new Error('安装任务 ID 无效')
+    let job = this.appJobs.get(jobId)
+    if (!job) try { job = JSON.parse(await readFile(this.appJobFile(jobId), 'utf8')) } catch {}
     if (!job) throw new Error('安装任务不存在或服务已重启')
     if (job.state !== 'running') setTimeout(() => this.appJobs.delete(jobId), 60_000)
     return JSON.stringify(job)

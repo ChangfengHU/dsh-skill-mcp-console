@@ -25,6 +25,17 @@
 - Diagnosis of the first user attempt found no receipt, no installed Skills and
   seven missing MCP entries, proving that attempt did not complete.
 
+## 1.4.2 visual integration and recovery
+
+- Reworked the existing Apps content area without changing DSH navigation:
+  layered surfaces, stronger hierarchy, responsive detail layout and dark mode.
+- Added four visible installation stages, persisted job snapshots and session
+  recovery after refresh; no credential is written into those snapshots.
+- MCP rows now distinguish App-managed connections from reused environment
+  entries and report runtime/tool evidence separately.
+- Screenshot acceptance covered light and dark desktop plus 390px responsive
+  layout with zero document horizontal overflow and no page errors.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome

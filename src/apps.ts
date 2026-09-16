@@ -31,6 +31,7 @@ export interface AppPreview {
   installedVersion: string | null
   enabled: boolean
   updateAvailable: boolean
+  managedMcp: string[]
 }
 
 interface AppReceipt {
@@ -150,6 +151,7 @@ export class AppInstaller {
       installedVersion: receipt?.version ?? null,
       enabled: receipt?.enabled !== false,
       updateAvailable: Boolean(receipt && receipt.revision !== revision),
+      managedMcp: receipt?.mcpAdded ?? [],
     })
     this.prune()
     this.previews.set(preview.previewId, {
@@ -176,6 +178,7 @@ export class AppInstaller {
       skills: (receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
       commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt), enabled: receipt?.enabled !== false,
       updateAvailable: false,
+      managedMcp: receipt?.mcpAdded ?? [],
     }]
   }
 
@@ -235,7 +238,7 @@ export class AppInstaller {
     const installed = Boolean(await this.readReceipt(entry.preview.name))
     checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
     progress('complete', 1, 1, '安装与验收完成')
-    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false }, checks }
+    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded] }, checks }
   }
 
   private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
