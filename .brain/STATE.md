@@ -10,7 +10,7 @@
 - App preview reads and pins the public GitHub release commit, exposes package
   contents without returning the bootstrap credential, and keeps confirmation
   state in host memory for ten minutes.
-- Production profile `web` loads package version 1.5.0. Apps includes a
+- Production profile `web` loads package version 1.5.1. Apps includes a
   catalog, six-tab detail view, live Skill/MCP state, lifecycle management and
   a fill-current-session action.
 - App command discovery follows the package's `command-support/catalog.json`
@@ -23,6 +23,9 @@
 - App Skill detail distinguishes App-managed, environment-reused, disabled
   and missing capabilities. Failed MCP/Codex acceptance no longer creates a
   successful receipt; it records a retryable failed state.
+- Independent same-name Skills are preserved and reused instead of aborting the
+  whole App. Receipts separately track declared Skills and App-owned Skills so
+  lifecycle actions never modify reused environment capabilities.
 
 ## Next action
 

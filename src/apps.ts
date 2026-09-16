@@ -40,6 +40,7 @@ interface AppReceipt {
   schema: number; name: string; version: string; revision: string; source: string
   skills: string[]; mcpServers: string[]; mcpAdded?: string[]; installedAt: string; enabled?: boolean
   status?: 'installed' | 'failed'; lastError?: string
+  managedSkills?: string[]
 }
 
 interface ParsedImport { slug: string; installer: string; token: string }
@@ -155,7 +156,7 @@ export class AppInstaller {
       enabled: receipt?.enabled !== false,
       updateAvailable: Boolean(receipt && receipt.revision !== revision),
       managedMcp: receipt?.mcpAdded ?? [],
-      managedSkills: receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
+      managedSkills: receipt?.managedSkills ?? receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     })
     this.prune()
     this.previews.set(preview.previewId, {
@@ -183,7 +184,7 @@ export class AppInstaller {
       commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt && receipt.status !== 'failed'), enabled: receipt?.enabled !== false,
       updateAvailable: false,
       managedMcp: receipt?.mcpAdded ?? [],
-      managedSkills: receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
+      managedSkills: receipt?.managedSkills ?? receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     }]
   }
 
@@ -196,9 +197,9 @@ export class AppInstaller {
     const checks: { name: string; ok: boolean; detail: string }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
     progress('skills', 0, expected.length, '正在安装 DSH Skills')
-    await this.installDshSkills(entry, expected)
-    progress('skills', expected.length, expected.length, `${expected.length} 个 Skills 已落地`)
-    checks.push({ name: 'DSH Skills', ok: true, detail: `${expected.length} 个已安装到原生能力目录` })
+    const skillResult = await this.installDshSkills(entry, expected)
+    progress('skills', expected.length, expected.length, `${skillResult.installed.length} 个安装，${skillResult.reused.length} 个复用`)
+    checks.push({ name: 'DSH Skills', ok: true, detail: `${skillResult.installed.length} 个由 App 安装，${skillResult.reused.length} 个环境复用` })
 
     const current = await toUniversal(this.patch, false)
     const previous = await this.readReceipt(entry.preview.name)
@@ -242,14 +243,14 @@ export class AppInstaller {
     const failures = checks.filter(check => !check.ok)
     if (failures.length) {
       const detail = failures.map(check => check.name).join('、')
-      await this.writeReceipt(entry, [...mcpAdded], 'failed', detail)
+      await this.writeReceipt(entry, [...mcpAdded], 'failed', detail, skillResult.managed)
       throw new Error(`安装未通过验收：${detail}。已保留阶段状态，可修复后重试。`)
     }
-    await this.writeReceipt(entry, [...mcpAdded])
+    await this.writeReceipt(entry, [...mcpAdded], 'installed', undefined, skillResult.managed)
     const installed = Boolean(await this.readReceipt(entry.preview.name))
     checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
     progress('complete', 1, 1, '安装与验收完成')
-    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded], managedSkills: expected, installState: 'installed' }, checks }
+    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded], managedSkills: skillResult.managed, installState: 'installed' }, checks }
   }
 
   private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
@@ -261,16 +262,21 @@ export class AppInstaller {
     } catch { return null }
   }
 
-  private async installDshSkills(entry: StoredPreview, names: string[]) {
+  private async installDshSkills(entry: StoredPreview, names: string[]): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
     const targetRoot = join(this.home, '.agents', 'skills')
-    const owned = (await this.readReceipt(entry.preview.name))?.skills ?? []
+    const previous = await this.readReceipt(entry.preview.name)
+    const owned = previous?.managedSkills ?? previous?.skills ?? []
+    const reused: string[] = []
+    const install: string[] = []
     for (const name of names) {
       const target = join(targetRoot, name)
       try {
         await access(target)
-        if (!owned.includes(name)) throw new Error(`Skill ${name} 已独立安装；为避免覆盖，App 安装已停止`)
+        if (!owned.includes(name)) reused.push(name)
+        else install.push(name)
       } catch (cause) {
-        if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
+        if ((cause as NodeJS.ErrnoException).code === 'ENOENT') install.push(name)
+        else throw cause
       }
     }
     await mkdir(targetRoot, { recursive: true })
@@ -278,11 +284,11 @@ export class AppInstaller {
     if (total > 40 * 1024 * 1024) throw new Error('App Skills 总大小超过 40 MB 限制')
     const temporary = new Map<string, string>()
     try {
-      for (const name of names) {
+      for (const name of install) {
         const dir = join(targetRoot, `.${name}.dsm-${randomUUID()}`)
         await mkdir(dir, { recursive: true }); temporary.set(name, dir)
       }
-      const jobs = entry.skillFiles.map(file => async () => {
+      const jobs = entry.skillFiles.filter(file => install.some(name => file.path.startsWith(`skills/${name}/`))).map(file => async () => {
         const match = /^skills\/([^/]+)\/(.+)$/.exec(file.path)
         if (!match || !temporary.has(match[1]) || file.size > 4 * 1024 * 1024) throw new Error(`不安全的 Skill 文件：${file.path}`)
         const relative = match[2]
@@ -298,24 +304,25 @@ export class AppInstaller {
         await writeFile(destination, data)
       })
       for (let index = 0; index < jobs.length; index += 8) await Promise.all(jobs.slice(index, index + 8).map(job => job()))
-      for (const name of names) {
+      for (const name of install) {
         const target = join(targetRoot, name)
         await rm(target, { recursive: true, force: true })
         await rename(temporary.get(name)!, target)
         temporary.delete(name)
       }
+      return { installed: install, reused, managed: [...new Set([...owned, ...install])] }
     } finally {
       for (const dir of temporary.values()) await rm(dir, { recursive: true, force: true }).catch(() => {})
     }
   }
 
-  private async writeReceipt(entry: StoredPreview, mcpAdded: string[], status: 'installed' | 'failed' = 'installed', lastError?: string) {
+  private async writeReceipt(entry: StoredPreview, mcpAdded: string[], status: 'installed' | 'failed' = 'installed', lastError?: string, managedSkills = entry.preview.skills.map(item => item.name)) {
     const file = this.receiptFile(entry.preview.name)
     await mkdir(dirname(file), { recursive: true })
     const temporary = `${file}.${randomUUID()}.tmp`
     await writeFile(temporary, JSON.stringify({
       schema: 1, name: entry.preview.name, version: entry.preview.version, revision: entry.revision,
-      source: entry.repo, skills: entry.preview.skills.map(item => item.name),
+      source: entry.repo, skills: entry.preview.skills.map(item => item.name), managedSkills,
       mcpServers: entry.preview.mcpServers.map(item => item.name), mcpAdded,
       installedAt: new Date().toISOString(), enabled: true, status, ...(lastError ? { lastError } : {}),
     }, null, 2) + '\n', { mode: 0o600 })
@@ -327,7 +334,7 @@ export class AppInstaller {
     const receipt = await this.readReceipt(name)
     if (!receipt) throw new Error('App 未安装')
     let changed = 0
-    for (const skill of receipt.skills) {
+    for (const skill of receipt.managedSkills ?? receipt.skills) {
       const dir = join(this.home, '.agents', 'skills', skill)
       try { await setSkillState(this.home, dir, enabled ? 'on' : 'off'); changed++ } catch {}
     }
@@ -346,7 +353,7 @@ export class AppInstaller {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const trash = join(this.home, '.dsh', 'app-trash', stamp, name)
     const moved: string[] = []
-    for (const skill of receipt.skills) {
+    for (const skill of receipt.managedSkills ?? receipt.skills) {
       const source = join(this.home, '.agents', 'skills', skill)
       try {
         await access(source)

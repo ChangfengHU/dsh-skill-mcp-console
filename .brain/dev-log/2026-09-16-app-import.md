@@ -46,6 +46,14 @@
 - Browser screenshot acceptance verified the 0/29 initial state, summary and
   all rows in dark theme with no page errors or horizontal overflow.
 
+## 1.5.1 independent Skill reuse
+
+- Diagnosed the first real install failure at 0/29: an independently installed
+  `vyibc-character-design` collided with the App declaration.
+- The installer now preserves and reuses independent same-name Skills, installs
+  only missing/App-owned entries, and records ownership separately so disable
+  or uninstall cannot touch reused capabilities.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome
