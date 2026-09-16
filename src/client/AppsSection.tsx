@@ -1,90 +1,33 @@
-import { useState } from 'react'
-import type { AppPreview } from '../wire.ts'
+import { useEffect, useMemo, useState } from 'react'
+import type { AppPreview, McpRow, SkillRow } from '../wire.ts'
 
+type Check = { name: string; ok: boolean; detail: string }
 export interface AppsApi {
-  inspectApp: (input: string) => Promise<AppPreview>
-  installApp: (previewId: string) => Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }>
+  apps: () => Promise<AppPreview[]>; inspectApp: (input: string) => Promise<AppPreview>
+  installApp: (id: string) => Promise<{ app: AppPreview; checks: Check[] }>
+  setAppEnabled: (name: string, enabled: boolean) => Promise<void>
+  uninstallApp: (name: string) => Promise<{ trash: string }>
+  skills: () => Promise<SkillRow[]>; mcp: () => Promise<McpRow[]>; insertPrompt: (text: string) => boolean
 }
+const tabs = ['概览', 'Skills', 'MCP', '指令', 'Hooks', '内容']
 
-function PartList({ title, items }: { title: string; items: { name: string }[] }) {
-  return (
-    <div className="dsm-app-part">
-      <div><b>{title}</b><span>{items.length}</span></div>
-      {items.length ? <ul>{items.map(item => <li key={item.name}><code>{item.name}</code></li>)}</ul> : <p>此版本未声明</p>}
-    </div>
-  )
-}
-
-/** Aggregate App import: inspect first, install only after an explicit confirmation. */
 export function AppsSection({ api }: { api: AppsApi }) {
-  const [input, setInput] = useState('')
-  const [preview, setPreview] = useState<AppPreview | null>(null)
-  const [checks, setChecks] = useState<{ name: string; ok: boolean; detail: string }[]>([])
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  const inspect = async () => {
-    setBusy(true); setError(''); setChecks([])
-    try { setPreview(await api.inspectApp(input)); setInput('') }
-    catch (cause) { setPreview(null); setError((cause as Error).message) }
-    finally { setBusy(false) }
+  const [apps, setApps] = useState<AppPreview[]>([]), [chosen, setChosen] = useState<AppPreview | null>(null)
+  const [skills, setSkills] = useState<SkillRow[]>([]), [mcp, setMcp] = useState<McpRow[]>([])
+  const [filter, setFilter] = useState('全部'), [query, setQuery] = useState(''), [tab, setTab] = useState('概览')
+  const [dialog, setDialog] = useState(false), [input, setInput] = useState(''), [preview, setPreview] = useState<AppPreview | null>(null)
+  const [checks, setChecks] = useState<Check[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const load = async () => { try { const [a, s, m] = await Promise.all([api.apps(), api.skills(), api.mcp()]); setApps(a); setSkills(s); setMcp(m); setChosen(x => x ? a.find(y => y.name === x.name) ?? x : x) } catch (e) { setError((e as Error).message) } }
+  useEffect(() => { void load() }, [])
+  const visible = useMemo(() => apps.filter(a => (filter === '全部' || filter === '已安装' && a.installed || filter === '可安装' && !a.installed) && `${a.name} ${a.displayName} ${a.description}`.toLowerCase().includes(query.toLowerCase())), [apps, filter, query])
+  const inspect = async () => { setBusy(true); setError(''); try { setPreview(await api.inspectApp(input)); setInput('') } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  const install = async () => { if (!preview) return; setBusy(true); try { const r = await api.installApp(preview.previewId); setPreview(r.app); setChecks(r.checks); await load() } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  const close = () => { setDialog(false); setPreview(null); setChecks([]); setError('') }
+  if (chosen) {
+    const parts = tab === 'Skills' ? chosen.skills.map(x => ({ name: x.name, status: skills.find(s => s.id === x.name)?.state ?? '未安装' })) : tab === 'MCP' ? chosen.mcpServers.map(x => ({ name: x.name, status: mcp.find(m => m.name === x.name)?.disabled === false ? '已连接' : '未连接' })) : tab === '指令' ? chosen.commands.map(x => ({ name: x.name, status: '已声明' })) : tab === 'Hooks' ? chosen.hooks.map(x => ({ name: x.name, status: '已声明' })) : [...chosen.skills.map(x => ({ name: `skills/${x.name}`, status: 'Skill' })), ...chosen.mcpServers.map(x => ({ name: x.name, status: 'MCP' }))]
+    return <section className="dsm-root dsm-app-detail"><button className="dsm-link" onClick={() => setChosen(null)}>← 返回 Apps</button><div className="dsm-app-hero"><i className="dsm-app-logo">CV</i><div className="dsm-grow"><small>{chosen.publisher} · v{chosen.version}</small><h2>{chosen.displayName}</h2><p>{chosen.description}</p><State app={chosen} /></div><div className="dsm-actions">{chosen.installed ? <><button className="dsm-btn dsm-primary" onClick={() => api.insertPrompt('使用 Cartoon Video Studio 帮我创建一个卡通视频项目。')}>使用 App</button><button className="dsm-btn" onClick={async () => { setBusy(true); await api.setAppEnabled(chosen.name, !chosen.enabled); await load(); setBusy(false) }}>{chosen.enabled ? '停用' : '启用'}</button><button className="dsm-btn dsm-danger" onClick={async () => { if (confirm('卸载后能力文件会移入可恢复回收区，继续吗？')) { await api.uninstallApp(chosen.name); await load() } }}>卸载</button></> : <button className="dsm-btn dsm-primary" onClick={() => setDialog(true)}>安装 App</button>}</div></div><nav className="dsm-detail-tabs">{tabs.map(x => <button aria-selected={tab === x} onClick={() => setTab(x)}>{x}</button>)}</nav>{tab === '概览' ? <div className="dsm-app-overview"><main><h3>这个 App 能做什么</h3><p>{chosen.description}</p><div className="dsm-app-prompt"><b>快速开始</b><span>把示例指令填入会话，发送前仍可编辑。</span><button className="dsm-btn" onClick={() => api.insertPrompt('使用 Cartoon Video Studio，把我的故事制作成完整卡通视频。')}>填入会话</button></div><p>真实状态：{skills.filter(s => chosen.skills.some(x => x.name === s.id) && s.state === 'on').length}/{chosen.skills.length} Skills 启用，{mcp.filter(m => chosen.mcpServers.some(x => x.name === m.name) && !m.disabled).length}/{chosen.mcpServers.length} MCP 启用。</p></main><aside><b>来源</b><a href={`https://${chosen.source}/tree/${chosen.revision}`} target="_blank" rel="noreferrer">{chosen.source}</a><small>固定版本 {chosen.revision.slice(0, 12)}</small><b>权限</b><span>{chosen.permissions.join('、') || '未声明额外权限'}</span></aside></div> : <div className="dsm-app-list"><h3>{tab}</h3>{parts.length ? parts.map(x => <div><span className="dsm-app-dot" /><b>{x.name}</b><small>{x.status}</small></div>) : <p>此版本未声明</p>}</div>}{dialog ? <Import {...{ input, setInput, preview, checks, busy, error, inspect, install, close }} /> : null}</section>
   }
-  const install = async () => {
-    if (!preview) return
-    setBusy(true); setError('')
-    try {
-      const result = await api.installApp(preview.previewId)
-      setPreview(result.app); setChecks(result.checks); setInput('')
-    } catch (cause) { setError((cause as Error).message) }
-    finally { setBusy(false) }
-  }
-
-  return (
-    <section className="dsm-root dsm-apps">
-      <div className="dsm-head">
-        <div><h3>Apps</h3><p>把 Skill、MCP、指令和 Hook 作为一个能力包预检并安装。</p></div>
-      </div>
-      <div className="dsm-app-import">
-        <div className="dsm-field">
-          <label htmlFor="dsm-app-command">导入安装命令</label>
-          <textarea id="dsm-app-command" className="dsm-mono-input" rows={3} value={input}
-            onChange={event => { setInput(event.target.value); setPreview(null); setChecks([]); setError('') }}
-            placeholder="bash <(curl -fsSL https://skill.vyibc.com/…/install-….sh) --bootstrap-token …" />
-          <div className="dsm-hint">先解析和读取发布清单，不执行粘贴的 Shell；授权值不会在预览中回显。</div>
-        </div>
-        <button className="dsm-btn dsm-primary" disabled={busy || !input.trim()} onClick={() => void inspect()}>{busy ? '读取中…' : '解析并预检'}</button>
-      </div>
-
-      {preview ? <article className="dsm-app-preview">
-        <header>
-          <div className="dsm-app-mark">A</div>
-          <div className="dsm-grow"><h3>{preview.displayName}</h3><p>{preview.description}</p></div>
-          <span className={`dsm-chip ${preview.installed ? 'dsm-ok' : ''}`}>{preview.installed ? '已安装' : '待安装'}</span>
-        </header>
-        <dl className="dsm-app-meta">
-          <div><dt>App ID</dt><dd>{preview.name}</dd></div><div><dt>版本</dt><dd>{preview.version}</dd></div>
-          <div><dt>发布者</dt><dd>{preview.publisher}</dd></div><div><dt>来源</dt><dd>{preview.source}</dd></div>
-        </dl>
-        <div className="dsm-hint dsm-mono">固定发布版本 {preview.revision.slice(0, 12)}</div>
-        <div className="dsm-app-parts">
-          <PartList title="Skills" items={preview.skills} />
-          <PartList title="MCP" items={preview.mcpServers} />
-          <PartList title="指令" items={preview.commands} />
-          <PartList title="Hooks" items={preview.hooks} />
-        </div>
-        <div className="dsm-app-safety">
-          <b>安装范围</b>
-          <span>Codex Marketplace 与 App</span><span>{preview.mcpServers.length} 个 MCP 连接</span>
-          <span>{preview.permissions.length ? `权限：${preview.permissions.join('、')}` : '未声明额外权限'}</span>
-        </div>
-        {!preview.installed || checks.length === 0 ? <div className="dsm-foot">
-          <span className="dsm-hint">预检将在 {new Date(preview.expiresAt).toLocaleTimeString()} 过期</span>
-          <button className="dsm-btn dsm-primary" disabled={busy} onClick={() => void install()}>{busy ? '安装中…' : preview.installed ? '重新安装并验证' : '确认安装'}</button>
-        </div> : null}
-      </article> : null}
-
-      {checks.length ? <div className="dsm-app-checks"><b>安装后验收</b>{checks.map(check => <div key={check.name} className={check.ok ? 'dsm-ok-text' : 'dsm-err-text'}><span>{check.ok ? '✓' : '×'} {check.name}</span><small>{check.detail}</small></div>)}</div> : null}
-      {error ? <div className="dsm-err">{error}</div> : null}
-    </section>
-  )
+  return <section className="dsm-root dsm-app-catalog"><div className="dsm-app-titlebar"><div><h2>Apps</h2><p>安装完整能力包：Skills、MCP、指令与 Hooks。</p></div><button className="dsm-btn dsm-primary" onClick={() => setDialog(true)}>＋ 添加 App</button></div><div className="dsm-app-toolbar"><div className="dsm-tabs">{['全部', '已安装', '可安装'].map(x => <button aria-selected={filter === x} onClick={() => setFilter(x)}>{x}</button>)}</div><input className="dsm-input" placeholder="搜索 Apps" value={query} onChange={e => setQuery(e.target.value)} /></div><div className="dsm-app-grid">{visible.map(a => <button className="dsm-app-card" onClick={() => setChosen(a)}><div><i className="dsm-app-logo">CV</i><State app={a} /></div><h3>{a.displayName}</h3><p>{a.description}</p><small>{a.skills.length} Skills · {a.mcpServers.length} MCP · v{a.version}</small></button>)}<article className="dsm-app-source-card"><b>受信任来源</b><p>只解析受支持的发布格式，不执行粘贴的 Shell。</p><button className="dsm-link" onClick={() => setDialog(true)}>导入发布命令 →</button></article></div>{error && !dialog ? <div className="dsm-err">{error}</div> : null}{dialog ? <Import {...{ input, setInput, preview, checks, busy, error, inspect, install, close }} /> : null}</section>
 }
+function State({ app }: { app: AppPreview }) { return <span className={`dsm-chip ${app.installed && app.enabled ? 'dsm-ok' : ''}`}>{!app.installed ? '可安装' : app.updateAvailable ? '有更新' : app.enabled ? '已启用' : '已停用'}</span> }
+function Import(p: any) { return <div className="dsm-scrim"><div className="dsm-modal dsm-wide"><div className="dsm-modal-head"><h4>添加 App</h4><button className="dsm-x" onClick={p.close}>×</button></div><p className="dsm-hint">先解析内容和权限，确认后才安装；授权值不会回显。</p><textarea className="dsm-mono-input" rows={3} value={p.input} onChange={(e: any) => p.setInput(e.target.value)} placeholder="bash <(curl -fsSL https://skill.vyibc.com/…/install-….sh) --bootstrap-token …" />{p.preview ? <div className="dsm-app-install"><b>{p.preview.displayName} · v{p.preview.version}</b><span>{p.preview.skills.length} Skills · {p.preview.mcpServers.length} MCP · {p.preview.commands.length} 指令 · {p.preview.hooks.length} Hooks</span><button className="dsm-btn dsm-primary" disabled={p.busy || !p.preview.previewId} onClick={p.install}>确认安装</button></div> : <button className="dsm-btn dsm-primary" disabled={p.busy || !p.input.trim()} onClick={p.inspect}>解析并预检</button>}{p.checks.map((x: Check) => <div className={x.ok ? 'dsm-okbox' : 'dsm-err'}>{x.ok ? '✓' : '×'} {x.name} · {x.detail}</div>)}{p.error ? <div className="dsm-err">{p.error}</div> : null}<div className="dsm-foot"><button className="dsm-btn" onClick={p.close}>关闭</button></div></div></div> }

@@ -1,5 +1,13 @@
 # App import and installation
 
+## 1.2.0 Apps product surface
+
+- Replaced the import-only panel with the approved catalog/detail interaction.
+- Added live installed/enabled state, Skill/MCP runtime joins, prompt insertion,
+  update-aware confirmation, enable/disable, and recoverable uninstall.
+- Catalog rendering is local and immediate; a fresh signed import remains the
+  authority for exact release contents and credentials remain host-memory only.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome

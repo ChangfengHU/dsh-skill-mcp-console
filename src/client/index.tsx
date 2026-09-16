@@ -89,8 +89,14 @@ export async function apply(ctx: any): Promise<void> {
     setToolDisabled: async (server, tool, disabled) => { await call('setToolDisabled', { server, tool, disabled }) },
   }
   const appsApi: AppsApi = {
+    apps: () => call<AppPreview[]>('apps'),
     inspectApp: input => call<AppPreview>('inspectApp', { input }),
     installApp: previewId => call('installApp', { previewId }),
+    setAppEnabled: async (name_, enabled) => { await call('setAppEnabled', { name: name_, enabled }) },
+    uninstallApp: name_ => call('uninstallApp', { name: name_ }),
+    skills: () => call<SkillRow[]>('skills'),
+    mcp: () => call<McpRow[]>('mcp'),
+    insertPrompt: text => startNewSessionWith(text),
   }
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({

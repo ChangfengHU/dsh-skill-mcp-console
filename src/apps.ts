@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { run } from './install.ts'
 import { fromUniversal, toUniversal } from './mcpconfig.ts'
+import { setSkillState } from './skills.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -27,6 +28,14 @@ export interface AppPreview {
   hooks: AppPart[]
   permissions: string[]
   installed: boolean
+  installedVersion: string | null
+  enabled: boolean
+  updateAvailable: boolean
+}
+
+interface AppReceipt {
+  schema: number; name: string; version: string; revision: string; source: string
+  skills: string[]; mcpServers: string[]; mcpAdded?: string[]; installedAt: string; enabled?: boolean
 }
 
 interface ParsedImport { slug: string; installer: string; token: string }
@@ -56,7 +65,7 @@ export function parseAppImport(input: string): ParsedImport {
 }
 
 async function text(url: string): Promise<string> {
-  const response = await fetch(url, { redirect: 'error', headers: { 'user-agent': 'dsh-skill-mcp-console' } })
+  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } })
   if (!response.ok) throw new Error(`读取 App 清单失败（HTTP ${response.status}）`)
   const body = await response.text()
   if (body.length > MAX_TEXT) throw new Error('App 清单超过大小限制')
@@ -118,6 +127,7 @@ export class AppInstaller {
     const skillNames = [...new Set(paths.flatMap(path => /^skills\/([^/]+)\/SKILL\.md$/.exec(path)?.[1] ?? []))].sort()
     const commandNames = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
     const hookNames = [...new Set(paths.flatMap(path => /^hooks\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
+    const receipt = await this.readReceipt(contract.plugin)
     const preview = publicPreview({
       name: manifest.name,
       displayName: manifest.interface?.displayName || manifest.name,
@@ -132,7 +142,10 @@ export class AppInstaller {
       commands: commandNames.map(name => ({ name })),
       hooks: hookNames.map(name => ({ name })),
       permissions: Array.isArray(manifest.interface?.capabilities) ? manifest.interface.capabilities : [],
-      installed: await this.isDshInstalled(contract.plugin, revision),
+      installed: Boolean(receipt),
+      installedVersion: receipt?.version ?? null,
+      enabled: receipt?.enabled !== false,
+      updateAvailable: Boolean(receipt && receipt.revision !== revision),
     })
     this.prune()
     this.previews.set(preview.previewId, {
@@ -140,6 +153,25 @@ export class AppInstaller {
       skillFiles: files.filter(item => item.path.startsWith('skills/')), ...contract,
     })
     return preview
+  }
+
+  /** Public catalog metadata. Installation still requires a fresh signed command. */
+  async catalog(): Promise<AppPreview[]> {
+    // Catalog navigation must not wait on four publisher/GitHub requests. The
+    // signed import preview below remains the authority for the exact release.
+    const receipt = await this.readReceipt('cartoon-video-studio')
+    const names = ['cartoon-hongyi','cartoon-video-studio','cartoon-xiaban','general-video','hyperframes-animation','hyperframes-audio','hyperframes-cli','hyperframes-core','hyperframes-creative','hyperframes-keyframes','hyperframes-registry','hyperframes','media-use','studio-ali','studio-character-workflow','studio-check','studio-director','studio-help','studio-hongyi','studio-materials','studio-music','studio-new','studio-publish','studio-quality','studio-revise','studio-xiabanxiaoren','studio','voice-production','vyibc-character-design']
+    const servers = ['vyibc-cartoon-assets','vyibc-image','vyibc-douyin','vyibc-youtube','vyibc-voice','vyibc-behavior','vyibc-xiaohongshu','vyibc-vault']
+    return [{
+      previewId: '', expiresAt: 0, name: 'cartoon-video-studio', displayName: '卡通视频工作室',
+      version: receipt?.version ?? '0.7.2', installedVersion: receipt?.version ?? null,
+      description: '从角色、选声到连续表演和成片验收，把完整卡通视频制作能力带进会话。',
+      publisher: 'ChangfengHU', source: 'github.com/ChangfengHU/cartoon-video-skills',
+      revision: receipt?.revision ?? 'main', installer: `https://${INSTALLER_HOST}/cartoon-video-studio/release/install-cartoon-video-studio.sh`,
+      skills: (receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
+      commands: [], hooks: [], permissions: [], installed: Boolean(receipt), enabled: receipt?.enabled !== false,
+      updateAvailable: false,
+    }]
   }
 
   async install(previewId: string): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
@@ -154,12 +186,18 @@ export class AppInstaller {
     checks.push({ name: 'DSH Skills', ok: true, detail: `${expected.length} 个已安装到原生能力目录` })
 
     const current = await toUniversal(this.patch, false)
-    for (const server of entry.preview.mcpServers) current[server.name] = {
-      type: 'http', url: `${entry.bridge.replace(/\/$/, '')}/${server.name}`,
-      headers: { Authorization: `Bearer ${entry.token}` }, failOnStartupError: false,
+    const previous = await this.readReceipt(entry.preview.name)
+    const mcpAdded = new Set(previous?.mcpAdded ?? [])
+    for (const server of entry.preview.mcpServers) {
+      if (current[server.name]) continue
+      current[server.name] = {
+        type: 'http', url: `${entry.bridge.replace(/\/$/, '')}/${server.name}`,
+        headers: { Authorization: `Bearer ${entry.token}` }, failOnStartupError: false,
+      }
+      mcpAdded.add(server.name)
     }
     await fromUniversal(this.patch, current)
-    checks.push({ name: 'DSH MCP', ok: true, detail: `${entry.preview.mcpServers.length} 个连接已写入当前 Profile，服务将自动重载` })
+    checks.push({ name: 'DSH MCP', ok: true, detail: `${mcpAdded.size} 个由 App 管理，其余复用；服务将自动重载` })
 
     for (const server of entry.preview.mcpServers) {
       const endpoint = `${entry.bridge.replace(/\/$/, '')}/${server.name}`
@@ -183,25 +221,24 @@ export class AppInstaller {
     const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
     checks.push({ name: 'Codex Plugin', ok: codexOk, detail: codexOk ? '已安装并启用' : `DSH 能力已安装；Codex 侧未完成：${clean(plugin.out).trim()}` })
 
-    await this.writeReceipt(entry)
-    const installed = await this.isDshInstalled(entry.preview.name, entry.revision)
+    await this.writeReceipt(entry, [...mcpAdded])
+    const installed = Boolean(await this.readReceipt(entry.preview.name))
     checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
-    return { app: { ...entry.preview, installed }, checks }
+    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false }, checks }
   }
 
   private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
 
-  private async isDshInstalled(name: string, revision: string): Promise<boolean> {
+  private async readReceipt(name: string): Promise<AppReceipt | null> {
     try {
-      const record = JSON.parse(await readFile(this.receiptFile(name), 'utf8')) as { revision?: string }
-      return record.revision === revision
-    } catch { return false }
+      const record = JSON.parse(await readFile(this.receiptFile(name), 'utf8')) as AppReceipt
+      return record.name === name && Array.isArray(record.skills) ? record : null
+    } catch { return null }
   }
 
   private async installDshSkills(entry: StoredPreview, names: string[]) {
     const targetRoot = join(this.home, '.agents', 'skills')
-    let owned: string[] = []
-    try { owned = (JSON.parse(await readFile(this.receiptFile(entry.preview.name), 'utf8')) as { skills?: string[] }).skills ?? [] } catch {}
+    const owned = (await this.readReceipt(entry.preview.name))?.skills ?? []
     for (const name of names) {
       const target = join(targetRoot, name)
       try {
@@ -247,15 +284,66 @@ export class AppInstaller {
     }
   }
 
-  private async writeReceipt(entry: StoredPreview) {
+  private async writeReceipt(entry: StoredPreview, mcpAdded: string[]) {
     const file = this.receiptFile(entry.preview.name)
     await mkdir(dirname(file), { recursive: true })
     const temporary = `${file}.${randomUUID()}.tmp`
     await writeFile(temporary, JSON.stringify({
       schema: 1, name: entry.preview.name, version: entry.preview.version, revision: entry.revision,
       source: entry.repo, skills: entry.preview.skills.map(item => item.name),
-      mcpServers: entry.preview.mcpServers.map(item => item.name), installedAt: new Date().toISOString(),
+      mcpServers: entry.preview.mcpServers.map(item => item.name), mcpAdded,
+      installedAt: new Date().toISOString(), enabled: true,
     }, null, 2) + '\n', { mode: 0o600 })
+    await rename(temporary, file)
+  }
+
+  async setEnabled(name: string, enabled: boolean): Promise<{ changed: number }> {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(name)) throw new Error('App ID 无效')
+    const receipt = await this.readReceipt(name)
+    if (!receipt) throw new Error('App 未安装')
+    let changed = 0
+    for (const skill of receipt.skills) {
+      const dir = join(this.home, '.agents', 'skills', skill)
+      try { await setSkillState(this.home, dir, enabled ? 'on' : 'off'); changed++ } catch {}
+    }
+    const current = await toUniversal(this.patch, false)
+    for (const server of receipt.mcpAdded ?? []) if (current[server]) current[server].disabled = !enabled
+    await fromUniversal(this.patch, current)
+    receipt.enabled = enabled
+    await this.writeReceiptValue(receipt)
+    return { changed }
+  }
+
+  async uninstall(name: string): Promise<{ moved: string[]; preservedMcp: string[] }> {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(name)) throw new Error('App ID 无效')
+    const receipt = await this.readReceipt(name)
+    if (!receipt) throw new Error('App 未安装')
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const trash = join(this.home, '.dsh', 'app-trash', stamp, name)
+    const moved: string[] = []
+    for (const skill of receipt.skills) {
+      const source = join(this.home, '.agents', 'skills', skill)
+      try {
+        await access(source)
+        await mkdir(join(trash, 'skills'), { recursive: true })
+        await rename(source, join(trash, 'skills', skill)); moved.push(skill)
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
+      }
+    }
+    const current = await toUniversal(this.patch, false)
+    for (const server of receipt.mcpAdded ?? []) delete current[server]
+    await fromUniversal(this.patch, current)
+    await mkdir(trash, { recursive: true })
+    await rename(this.receiptFile(name), join(trash, 'receipt.json'))
+    await run('codex', ['plugin', 'remove', `${name}@personal`])
+    return { moved, preservedMcp: receipt.mcpServers.filter(server => !(receipt.mcpAdded ?? []).includes(server)) }
+  }
+
+  private async writeReceiptValue(receipt: AppReceipt) {
+    const file = this.receiptFile(receipt.name)
+    const temporary = `${file}.${randomUUID()}.tmp`
+    await writeFile(temporary, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 })
     await rename(temporary, file)
   }
 

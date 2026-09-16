@@ -261,8 +261,31 @@ export class SkillMcpService extends TypertRemoteService {
     // The patch layer and native skill registry are read at boot. Exit only
     // after the response has left; the supervised service comes back with the
     // newly installed capabilities instead of reporting success for stale state.
-    setTimeout(() => { try { (this.ctx.loader as { exit?: () => void }).exit?.() } catch {} }, 750)
+    this.reloadHost()
     return JSON.stringify(result)
+  }
+
+  /** Available and installed Apps with live release metadata. */
+  async apps(): Promise<string> {
+    return JSON.stringify(await this.appInstaller.catalog())
+  }
+
+  async setAppEnabled(payload: string): Promise<string> {
+    const { name, enabled } = JSON.parse(payload) as { name: string; enabled: boolean }
+    const result = await this.appInstaller.setEnabled(name, enabled)
+    this.invalidate(); this.reloadHost()
+    return JSON.stringify(result)
+  }
+
+  async uninstallApp(payload: string): Promise<string> {
+    const { name } = JSON.parse(payload) as { name: string }
+    const result = await this.appInstaller.uninstall(name)
+    this.invalidate(); this.reloadHost()
+    return JSON.stringify(result)
+  }
+
+  private reloadHost(): void {
+    setTimeout(() => { try { (this.ctx.loader as { exit?: () => void }).exit?.() } catch {} }, 750)
   }
 
   /** Recognise what the user pasted. Runs nothing. */
