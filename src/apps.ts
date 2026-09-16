@@ -32,11 +32,14 @@ export interface AppPreview {
   enabled: boolean
   updateAvailable: boolean
   managedMcp: string[]
+  managedSkills: string[]
+  installState: 'available' | 'installed' | 'failed'
 }
 
 interface AppReceipt {
   schema: number; name: string; version: string; revision: string; source: string
   skills: string[]; mcpServers: string[]; mcpAdded?: string[]; installedAt: string; enabled?: boolean
+  status?: 'installed' | 'failed'; lastError?: string
 }
 
 interface ParsedImport { slug: string; installer: string; token: string }
@@ -147,11 +150,12 @@ export class AppInstaller {
       commands,
       hooks: hookNames.map(name => ({ name })),
       permissions: Array.isArray(manifest.interface?.capabilities) ? manifest.interface.capabilities : [],
-      installed: Boolean(receipt),
+      installed: Boolean(receipt && receipt.status !== 'failed'),
       installedVersion: receipt?.version ?? null,
       enabled: receipt?.enabled !== false,
       updateAvailable: Boolean(receipt && receipt.revision !== revision),
       managedMcp: receipt?.mcpAdded ?? [],
+      managedSkills: receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     })
     this.prune()
     this.previews.set(preview.previewId, {
@@ -176,9 +180,10 @@ export class AppInstaller {
       publisher: 'ChangfengHU', source: 'github.com/ChangfengHU/cartoon-video-skills',
       revision: receipt?.revision ?? 'main', installer: `https://${INSTALLER_HOST}/cartoon-video-studio/release/install-cartoon-video-studio.sh`,
       skills: (receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
-      commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt), enabled: receipt?.enabled !== false,
+      commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt && receipt.status !== 'failed'), enabled: receipt?.enabled !== false,
       updateAvailable: false,
       managedMcp: receipt?.mcpAdded ?? [],
+      managedSkills: receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     }]
   }
 
@@ -234,11 +239,17 @@ export class AppInstaller {
     const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
     checks.push({ name: 'Codex Plugin', ok: codexOk, detail: codexOk ? '已安装并启用' : `DSH 能力已安装；Codex 侧未完成：${clean(plugin.out).trim()}` })
 
+    const failures = checks.filter(check => !check.ok)
+    if (failures.length) {
+      const detail = failures.map(check => check.name).join('、')
+      await this.writeReceipt(entry, [...mcpAdded], 'failed', detail)
+      throw new Error(`安装未通过验收：${detail}。已保留阶段状态，可修复后重试。`)
+    }
     await this.writeReceipt(entry, [...mcpAdded])
     const installed = Boolean(await this.readReceipt(entry.preview.name))
     checks.unshift({ name: 'App', ok: installed, detail: installed ? `${entry.preview.name} ${entry.preview.version} · DSH 已登记` : 'DSH App 登记失败' })
     progress('complete', 1, 1, '安装与验收完成')
-    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded] }, checks }
+    return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded], managedSkills: expected, installState: 'installed' }, checks }
   }
 
   private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
@@ -298,7 +309,7 @@ export class AppInstaller {
     }
   }
 
-  private async writeReceipt(entry: StoredPreview, mcpAdded: string[]) {
+  private async writeReceipt(entry: StoredPreview, mcpAdded: string[], status: 'installed' | 'failed' = 'installed', lastError?: string) {
     const file = this.receiptFile(entry.preview.name)
     await mkdir(dirname(file), { recursive: true })
     const temporary = `${file}.${randomUUID()}.tmp`
@@ -306,7 +317,7 @@ export class AppInstaller {
       schema: 1, name: entry.preview.name, version: entry.preview.version, revision: entry.revision,
       source: entry.repo, skills: entry.preview.skills.map(item => item.name),
       mcpServers: entry.preview.mcpServers.map(item => item.name), mcpAdded,
-      installedAt: new Date().toISOString(), enabled: true,
+      installedAt: new Date().toISOString(), enabled: true, status, ...(lastError ? { lastError } : {}),
     }, null, 2) + '\n', { mode: 0o600 })
     await rename(temporary, file)
   }

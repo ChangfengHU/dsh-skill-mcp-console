@@ -36,6 +36,16 @@
 - Screenshot acceptance covered light and dark desktop plus 390px responsive
   layout with zero document horizontal overflow and no page errors.
 
+## 1.5.0 capability state integrity
+
+- Replaced repetitive Skill labels with an aggregate 4-way summary and
+  per-row ownership/state chips: App managed, environment reused and missing.
+- Installation now writes a successful receipt only after every declared MCP
+  and Codex registration check passes. Partial installs retain failed ownership
+  state so a retry can repair them without misreporting success.
+- Browser screenshot acceptance verified the 0/29 initial state, summary and
+  all rows in dark theme with no page errors or horizontal overflow.
+
 Implemented the first real Apps workflow in `dsh-skill-mcp-console`.
 
 ## Outcome

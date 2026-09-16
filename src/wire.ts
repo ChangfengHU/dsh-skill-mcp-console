@@ -60,6 +60,8 @@ export interface AppPreview {
   permissions: string[]; installed: boolean; installedVersion: string | null
   enabled: boolean; updateAvailable: boolean
   managedMcp: string[]
+  managedSkills: string[]
+  installState: 'available' | 'installed' | 'failed'
 }
 
 /** The canonical invocation list. Both faces register exactly this. */
