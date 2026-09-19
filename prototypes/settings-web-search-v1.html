@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DSH Settings · Web Search Prototype</title>
+  <style>
+    :root{color-scheme:dark;--bg:#111214;--sidebar:#18191b;--panel:#2a2a2d;--panel2:#303034;--line:#434348;--line2:#55565c;--text:#f0f1f3;--muted:#a6a8ad;--soft:#85888f;--accent:#8fa8ff;--green:#62d49b;--amber:#e5b866;--red:#ee8c8c;--blue:#7897ff}
+    *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    button,input,select{font:inherit}.app{height:100%;display:flex;background:radial-gradient(circle at 67% 48%,#18191d 0,#111214 45%)}
+    .shell{width:280px;border-right:1px solid #292a2d;background:#18191b;padding:24px 14px;color:#d6d7d9}.brand{font-size:20px;font-weight:700;letter-spacing:.02em;margin-bottom:28px}.brand small{font-size:10px;border:1px solid #777;border-radius:3px;padding:2px 4px;margin-left:6px}.ghost-line{height:12px;border-radius:5px;background:#252629;margin:14px 2px}.ghost-line.short{width:58%}.settings-trigger{position:absolute;bottom:26px;left:18px;display:flex;gap:10px;align-items:center;color:#eee}
+    .stage{flex:1;display:grid;place-items:center;padding:28px}.modal{width:min(1100px,calc(100vw - 360px));height:min(860px,calc(100vh - 70px));min-width:860px;background:#2a2a2d;border:1px solid #34353a;border-radius:24px;box-shadow:0 28px 80px #0009;display:flex;overflow:hidden;position:relative}
+    .settings-nav{width:190px;padding:22px 12px;border-right:1px solid #3a3b3f}.settings-nav h1{font-size:15px;margin:7px 12px 20px}.nav-item{width:100%;height:42px;border:0;background:transparent;color:#e4e5e7;border-radius:11px;display:flex;align-items:center;gap:11px;padding:0 13px;text-align:left;cursor:pointer}.nav-item:hover{background:#38393d}.nav-item.active{background:#4a4b51;color:#fff}.nav-item svg{width:17px;height:17px;opacity:.9}.nav-divider{height:1px;background:#3a3b3f;margin:10px 8px}
+    .content{flex:1;min-width:0;display:flex;flex-direction:column}.topbar{height:74px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid #3a3b3f;gap:12px}.topbar-title{font-size:17px;font-weight:650}.plugin-pill,.status-pill,.price{font-size:11px;border-radius:999px;padding:5px 9px;border:1px solid #505159;color:#cfd1d6}.status-pill{color:#a9ebc9;border-color:#42745d;background:#29483a55}.top-actions{margin-left:auto;display:flex;gap:9px}.btn{border:1px solid #56575e;background:#34353a;color:#eee;border-radius:9px;padding:8px 12px;cursor:pointer}.btn:hover{background:#414248}.btn.primary{background:#e6e7eb;color:#1d1e20;border-color:#e6e7eb;font-weight:650}.btn.primary:hover{background:#fff}.btn.small{padding:6px 9px;font-size:12px}.close{width:33px;height:33px;border:1px solid #e1e1e1;border-radius:50%;background:transparent;color:#fff;font-size:20px;display:grid;place-items:center}
+    .scroll{padding:20px 24px 30px;overflow:auto}.summary{display:grid;grid-template-columns:1.2fr .8fr;gap:13px;margin-bottom:16px}.card{border:1px solid var(--line);border-radius:14px;background:#2d2d31;padding:16px}.card h2{font-size:14px;margin:0 0 5px}.card p{font-size:12px;color:var(--muted);margin:0;line-height:1.55}.route-head{display:flex;justify-content:space-between;gap:16px;align-items:center}.seg{display:flex;background:#222326;border:1px solid #44454a;border-radius:10px;padding:3px}.seg button{border:0;background:transparent;color:#aaa;padding:7px 11px;border-radius:7px;font-size:12px;cursor:pointer}.seg button.active{background:#4a4b50;color:#fff}.metric{display:flex;gap:10px;margin-top:13px}.metric div{flex:1;border-top:1px solid #414247;padding-top:10px}.metric b{display:block;font-size:18px}.metric span{font-size:11px;color:#999}
+    .section-head{display:flex;align-items:end;justify-content:space-between;margin:20px 0 10px}.section-head h2{font-size:15px;margin:0}.section-head p{font-size:12px;color:#96989e;margin:4px 0 0}.section-head button{border:0;background:transparent;color:#b7c5ff;cursor:pointer}
+    .providers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.provider{border:1px solid var(--line);background:#2e2e32;border-radius:13px;padding:14px;cursor:pointer;transition:.16s}.provider:hover,.provider.selected{border-color:#7b7d86;background:#35353a}.provider.disabled{opacity:.58}.provider-top{display:flex;align-items:center;gap:10px}.provider-logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#222328;font-weight:800}.provider-title{font-size:13px;font-weight:650}.provider-sub{font-size:11px;color:#999;margin-top:3px}.price{margin-left:auto}.price.free{color:#9be7bd;border-color:#3e7157}.price.freemium{color:#f1ce8d;border-color:#735f38}.price.retired{color:#c7c8cd}.provider-foot{display:flex;gap:10px;align-items:center;margin-top:12px;font-size:11px;color:#9b9da3}.dot{width:7px;height:7px;border-radius:50%;background:#73767d}.dot.ok{background:var(--green)}.dot.warn{background:var(--amber)}.toggle{margin-left:auto;width:32px;height:18px;border-radius:20px;background:#55575d;padding:2px}.toggle:after{content:"";display:block;width:14px;height:14px;border-radius:50%;background:white;transition:.15s}.toggle.on{background:#647edc}.toggle.on:after{transform:translateX(14px)}
+    .rules{display:grid;gap:8px}.rule{display:grid;grid-template-columns:140px 1fr auto;gap:12px;align-items:center;border:1px solid #414247;border-radius:11px;padding:11px 12px;background:#2d2d31}.rule-name{font-size:12px;font-weight:650}.rule-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.engine-tag{font-size:11px;border:1px solid #505158;background:#393a3f;padding:5px 8px;border-radius:7px}.arrow{color:#777}.rule-meta{font-size:11px;color:#96989e}
+    .drawer{position:absolute;right:0;top:0;width:420px;height:100%;background:#292a2e;border-left:1px solid #4a4b50;box-shadow:-18px 0 45px #0007;padding:22px;transform:translateX(105%);transition:.22s;z-index:5}.drawer.open{transform:none}.drawer-head{display:flex;align-items:center;gap:11px;padding-bottom:16px;border-bottom:1px solid #424349}.drawer-head h2{font-size:16px;margin:0}.drawer-head p{font-size:11px;color:#999;margin:3px 0 0}.drawer-close{margin-left:auto;border:0;background:transparent;color:white;font-size:22px;cursor:pointer}.field{margin-top:16px}.field label{font-size:12px;display:flex;justify-content:space-between;margin-bottom:7px}.field label a{color:#aebcff;text-decoration:none}.input{width:100%;height:39px;border-radius:9px;border:1px solid #505159;background:#202124;color:#eee;padding:0 11px}.hint{font-size:11px;color:#91939a;margin-top:7px;line-height:1.5}.drawer-actions{display:flex;gap:9px;margin-top:20px}.test-result{margin-top:13px;border:1px solid #3d6c55;background:#263e33;border-radius:9px;color:#a9e6c5;padding:10px 11px;font-size:12px;display:none}.test-result.show{display:block}.notice{display:flex;gap:9px;margin-top:15px;border:1px solid #65583b;background:#3a3427;border-radius:10px;padding:10px;color:#dec795;font-size:11px;line-height:1.5}
+    .footnote{font-size:11px;color:#85878e;margin-top:14px}.prototype-label{position:fixed;right:18px;bottom:15px;font-size:11px;color:#85878e;background:#202125;border:1px solid #3b3c41;padding:7px 10px;border-radius:8px}
+    @media(max-width:1050px){.shell{display:none}.modal{width:calc(100vw - 30px);min-width:0}.providers{grid-template-columns:1fr}.summary{grid-template-columns:1fr}.drawer{width:min(420px,100%)}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="shell"><div class="brand">◒ deepseek <small>HARNESS</small></div><div class="ghost-line"></div><div class="ghost-line short"></div><div class="ghost-line"></div><div class="ghost-line short"></div><div class="settings-trigger">⚙ <span>Settings</span></div></aside>
+    <main class="stage">
+      <section class="modal" aria-label="Settings Web prototype">
+        <nav class="settings-nav">
+          <h1>Settings</h1>
+          <button class="nav-item">⚙ <span>General</span></button>
+          <button class="nav-item">◫ <span>Models</span></button>
+          <button class="nav-item active">⌕ <span>Web</span></button>
+          <button class="nav-item">☷ <span>Plugins</span></button>
+          <button class="nav-item">♙ <span>Agent presets</span></button>
+          <div class="nav-divider"></div>
+          <button class="nav-item">◉ <span>Apps</span></button>
+          <button class="nav-item">◇ <span>Skills</span></button>
+          <button class="nav-item">⌘ <span>MCP</span></button>
+        </nav>
+        <div class="content">
+          <header class="topbar">
+            <span class="topbar-title">Web Search</span>
+            <span class="plugin-pill">dsh-free-search · Plugin</span>
+            <span class="status-pill">● 运行正常</span>
+            <div class="top-actions"><button class="btn" id="testAll">测试全部</button><button class="btn primary" id="saveAll">保存更改</button><button class="close">×</button></div>
+          </header>
+          <div class="scroll">
+            <div class="summary">
+              <section class="card">
+                <div class="route-head"><div><h2>默认搜索策略</h2><p>Agent 仍调用原生 web_search，插件按规则选择 Provider。</p></div><div class="seg" id="mode"><button class="active">免费优先</button><button>质量优先</button><button>自定义</button></div></div>
+                <div class="metric"><div><b>4</b><span>已启用 Provider</span></div><div><b>3</b><span>路由规则</span></div><div><b>0</b><span>MCP 依赖</span></div></div>
+              </section>
+              <section class="card"><h2>凭据安全</h2><p>API Key 写入 DSH 凭据中心，页面只保存引用并显示“已配置”。Key 不进入日志、会话或导出配置。</p><div class="provider-foot"><span class="dot ok"></span><span>凭据中心可用</span><button class="btn small" style="margin-left:auto">管理凭据</button></div></section>
+            </div>
+
+            <div class="section-head"><div><h2>搜索提供商</h2><p>点击卡片配置；需要 Key 的服务同时提供官方申请地址。</p></div><button>＋ 添加自定义 Provider</button></div>
+            <div class="providers">
+              <article class="provider selected" data-provider="firecrawl"><div class="provider-top"><div class="provider-logo">F</div><div><div class="provider-title">Firecrawl</div><div class="provider-sub">搜索、抓取与站点解析</div></div><span class="price freemium">免费额度 · Key</span></div><div class="provider-foot"><span class="dot warn"></span><span>等待配置 API Key</span><span>优先级 3</span><span class="toggle on"></span></div></article>
+              <article class="provider" data-provider="tavily"><div class="provider-top"><div class="provider-logo">T</div><div><div class="provider-title">Tavily</div><div class="provider-sub">面向 Agent 的结构化搜索</div></div><span class="price freemium">免费额度 · Key</span></div><div class="provider-foot"><span class="dot warn"></span><span>未配置</span><span>优先级 2</span><span class="toggle on"></span></div></article>
+              <article class="provider" data-provider="ddg"><div class="provider-top"><div class="provider-logo">D</div><div><div class="provider-title">DuckDuckGo</div><div class="provider-sub">HTML 搜索，无正式通用 API</div></div><span class="price free">免费 · 无 Key</span></div><div class="provider-foot"><span class="dot ok"></span><span>289 ms · 可用</span><span>优先级 1</span><span class="toggle on"></span></div></article>
+              <article class="provider" data-provider="searxng"><div class="provider-top"><div class="provider-logo">S</div><div><div class="provider-title">SearXNG</div><div class="provider-sub">开源自托管元搜索</div></div><span class="price free">软件免费</span></div><div class="provider-foot"><span class="dot"></span><span>需要实例地址</span><span>优先级 4</span><span class="toggle"></span></div></article>
+              <article class="provider disabled" data-provider="bing"><div class="provider-top"><div class="provider-logo">B</div><div><div class="provider-title">Bing Search API</div><div class="provider-sub">旧 API 已于 2025-08-11 退役</div></div><span class="price retired">不可新接入</span></div><div class="provider-foot"><span class="dot"></span><span>不进入路由</span><span style="margin-left:auto">查看迁移说明 ↗</span></div></article>
+            </div>
+
+            <div class="section-head"><div><h2>路由规则</h2><p>按证据要求路由，不依靠关键词硬编码；拖动 Provider 可调整顺序。</p></div><button>＋ 新增规则</button></div>
+            <div class="rules">
+              <div class="rule"><div class="rule-name">普通查询</div><div class="rule-chain"><span class="engine-tag">DuckDuckGo</span><span class="arrow">→</span><span class="engine-tag">Tavily</span><span class="arrow">→</span><span class="engine-tag">Firecrawl</span></div><div class="rule-meta">≥ 1 来源</div></div>
+              <div class="rule"><div class="rule-name">近期 / 多来源</div><div class="rule-chain"><span class="engine-tag">Tavily</span><span class="arrow">→</span><span class="engine-tag">Firecrawl</span><span class="arrow">→</span><span class="engine-tag">SearXNG</span></div><div class="rule-meta">≥ 3 来源</div></div>
+              <div class="rule"><div class="rule-name">网页正文与站点</div><div class="rule-chain"><span class="engine-tag">Firecrawl</span><span class="arrow">→</span><span class="engine-tag">HTTP Fetch</span></div><div class="rule-meta">完整正文</div></div>
+            </div>
+            <p class="footnote">原型范围：只新增 Settings → Web；现有 General、Models、Plugins、Agent presets、Apps、Skills、MCP 均保留，未展示的功能不代表删除。</p>
+          </div>
+        </div>
+
+        <aside class="drawer open" id="drawer">
+          <div class="drawer-head"><div class="provider-logo" id="drawerLogo">F</div><div><h2 id="drawerTitle">Firecrawl</h2><p id="drawerSub">Provider 配置 · 非 MCP</p></div><button class="drawer-close" id="drawerClose">×</button></div>
+          <div class="field"><label>API Key <a id="applyLink" href="https://www.firecrawl.dev/app/api-keys" target="_blank">申请 API Key ↗</a></label><input class="input" id="apiKey" type="password" placeholder="输入后保存到 DSH 凭据中心" /><div class="hint">凭据名称：<code>FIRECRAWL_API_KEY</code>。保存后页面只显示“已配置”，不会返回明文。</div></div>
+          <div class="field"><label>API Endpoint <span style="color:#888">默认</span></label><input class="input" id="endpoint" value="https://api.firecrawl.dev/v2" /></div>
+          <div class="field"><label>用途</label><select class="input"><option>质量搜索 + 网页正文抓取</option><option>仅网页正文抓取</option><option>仅作为搜索回退</option></select></div>
+          <div class="field"><label>月度预算保护</label><select class="input"><option>仅使用免费额度，耗尽后停用</option><option>允许付费额度，但设置调用上限</option></select><div class="hint">Firecrawl 当前提供月度免费额度；页面只展示计划类型和用量，不代替服务商账单。</div></div>
+          <div class="drawer-actions"><button class="btn" id="testOne">测试连接</button><button class="btn primary" id="saveOne">保存 Provider</button></div>
+          <div class="test-result" id="testResult">✓ 连接成功 · Search 312 ms · Credential 未写入页面响应</div>
+          <div class="notice">ⓘ Firecrawl 在这里是 Web Provider。Agent 只看到原生 web_search，不会看到 Firecrawl MCP 工具。</div>
+        </aside>
+      </section>
+    </main>
+  </div>
+  <div class="prototype-label">STATIC PROTOTYPE · Settings / Web v1</div>
+  <script>
+    const drawer=document.querySelector('#drawer');
+    const info={
+      firecrawl:{logo:'F',title:'Firecrawl',key:'FIRECRAWL_API_KEY',link:'https://www.firecrawl.dev/app/api-keys',endpoint:'https://api.firecrawl.dev/v2',needs:true},
+      tavily:{logo:'T',title:'Tavily',key:'TAVILY_API_KEY',link:'https://app.tavily.com/home',endpoint:'https://api.tavily.com',needs:true},
+      ddg:{logo:'D',title:'DuckDuckGo',key:'无需凭据',link:'https://duckduckgo.com/',endpoint:'https://html.duckduckgo.com/html/',needs:false},
+      searxng:{logo:'S',title:'SearXNG',key:'可选实例凭据',link:'https://docs.searxng.org/admin/installation.html',endpoint:'https://your-searxng.example',needs:false},
+      bing:{logo:'B',title:'Bing Search API',key:'旧 API 已退役',link:'https://learn.microsoft.com/en-us/lifecycle/announcements/bing-search-api-retirement',endpoint:'不可配置',needs:false}
+    };
+    document.querySelectorAll('.provider').forEach(card=>card.addEventListener('click',()=>{
+      document.querySelectorAll('.provider').forEach(x=>x.classList.remove('selected'));card.classList.add('selected');const x=info[card.dataset.provider];
+      drawer.classList.add('open');document.querySelector('#drawerLogo').textContent=x.logo;document.querySelector('#drawerTitle').textContent=x.title;document.querySelector('#endpoint').value=x.endpoint;
+      const link=document.querySelector('#applyLink');link.href=x.link;link.textContent=x.title==='Bing Search API'?'查看退役说明 ↗':x.needs?'申请 API Key ↗':'查看官方文档 ↗';
+      document.querySelector('#apiKey').placeholder=x.needs?'输入后保存到 DSH 凭据中心':x.key;document.querySelector('#apiKey').disabled=!x.needs;document.querySelector('#testResult').classList.remove('show');
+    }));
+    document.querySelector('#drawerClose').onclick=()=>drawer.classList.remove('open');
+    document.querySelector('#testOne').onclick=()=>document.querySelector('#testResult').classList.add('show');
+    document.querySelector('#saveOne').onclick=e=>{e.currentTarget.textContent='已保存 ✓';setTimeout(()=>e.currentTarget.textContent='保存 Provider',1300)};
+    document.querySelector('#testAll').onclick=e=>{e.currentTarget.textContent='4/4 可用 ✓';setTimeout(()=>e.currentTarget.textContent='测试全部',1500)};
+    document.querySelector('#saveAll').onclick=e=>{e.currentTarget.textContent='已保存 ✓';setTimeout(()=>e.currentTarget.textContent='保存更改',1500)};
+    document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#mode button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+    document.querySelectorAll('.toggle').forEach(t=>t.onclick=e=>{e.stopPropagation();t.classList.toggle('on')});
+  </script>
+</body>
+</html>
