@@ -260,6 +260,11 @@ export class SkillMcpService extends TypertRemoteService {
     return JSON.stringify(await this.appInstaller.inspect(input))
   }
 
+  async inspectCatalogApp(payload: string): Promise<string> {
+    const { name } = JSON.parse(payload) as { name: string }
+    return JSON.stringify(await this.appInstaller.inspectCatalog(name))
+  }
+
   /** Install exactly the package bound to a recent server-side preview. */
   async installApp(payload: string): Promise<string> {
     const { previewId, overwriteSkills } = JSON.parse(payload) as { previewId: string; overwriteSkills?: boolean }

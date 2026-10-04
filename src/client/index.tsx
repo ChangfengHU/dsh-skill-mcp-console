@@ -93,6 +93,7 @@ export async function apply(ctx: any): Promise<void> {
     checkAppUpdates: () => call<AppPreview[]>('checkAppUpdates'),
     previewAppUpdate: name => call<AppPreview>('previewAppUpdate', { name }),
     inspectApp: input => call<AppPreview>('inspectApp', { input }),
+    inspectCatalogApp: name => call<AppPreview>('inspectCatalogApp', { name }),
     startAppInstall: (previewId, overwriteSkills) => call('startAppInstall', { previewId, overwriteSkills }),
     appInstallStatus: jobId => call('appInstallStatus', { jobId }),
     setAppEnabled: async (name_, enabled) => { await call('setAppEnabled', { name: name_, enabled }) },

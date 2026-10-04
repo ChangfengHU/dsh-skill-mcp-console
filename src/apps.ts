@@ -6,6 +6,7 @@ import { run } from './install.ts'
 import { fromUniversal, toUniversal } from './mcpconfig.ts'
 import { setSkillState } from './skills.ts'
 import { installerContract, exchangeCredentials } from './app-contract.ts'
+import { requestFleetAppGrant, type ReleaseMetadata } from './fleet-app-auth.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -112,18 +113,24 @@ export class AppInstaller {
     this.patch = patch
   }
 
-  async inspect(input: string): Promise<AppPreview> {
+  async inspectCatalog(name: string): Promise<AppPreview> {
+    const grant = await requestFleetAppGrant(name, await toUniversal(this.patch, false))
+    return this.inspect(grant.command, grant.metadata)
+  }
+
+  async inspect(input: string, metadata?: ReleaseMetadata): Promise<AppPreview> {
     const parsed = parseAppImport(input)
     const installerText = await text(parsed.installer)
     const contract = scriptContract(installerText, parsed.slug)
-    const head = await githubJson<{ sha?: string }>(`https://api.github.com/repos/${contract.repo}/commits/main`)
+    if (metadata && contract.repo !== 'ChangfengHU/cartoon-video-skills') throw new Error('Fleet 授权与发布仓库不一致')
+    const head = metadata ? { sha: metadata.revision } : await githubJson<{ sha?: string }>(`https://api.github.com/repos/${contract.repo}/commits/main`)
     if (!head.sha || !/^[0-9a-f]{40}$/.test(head.sha)) throw new Error('无法固定 App 发布版本')
     const revision = head.sha
     const rawBase = `https://raw.githubusercontent.com/${contract.repo}/${revision}`
     const manifestPath = `plugins/${contract.plugin}/.codex-plugin/plugin.json`
-    const manifest = await githubJson<any>(`${rawBase}/${manifestPath}`)
+    const manifest = metadata?.manifest ?? await githubJson<any>(`${rawBase}/${manifestPath}`)
     if (manifest.name !== contract.plugin || typeof manifest.version !== 'string') throw new Error('App manifest 与安装器声明不一致')
-    const tree = await githubJson<{ tree?: { path: string; type: string; size?: number }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
+    const tree = metadata ? { tree: metadata.tree } : await githubJson<{ tree?: { path: string; type: string; size?: number }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
     const prefix = `plugins/${contract.plugin}/`
     const files = (tree.tree ?? []).filter(item => item.type === 'blob' && item.path.startsWith(prefix))
       .map(item => ({ path: item.path.slice(prefix.length), size: item.size ?? 0 }))
@@ -131,7 +138,7 @@ export class AppInstaller {
     const skillNames = [...new Set(paths.flatMap(path => /^skills\/([^/]+)\/SKILL\.md$/.exec(path)?.[1] ?? []))].sort()
     let commands: AppPart[] = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort().map(name => ({ name }))
     if (paths.includes('command-support/catalog.json')) {
-      const catalog = await githubJson<{ commands?: { name?: string; description?: string }[] }>(`${rawBase}/plugins/${contract.plugin}/command-support/catalog.json`)
+      const catalog = metadata?.commands ?? await githubJson<{ commands?: { name?: string; description?: string }[] }>(`${rawBase}/plugins/${contract.plugin}/command-support/catalog.json`)
       commands = (catalog.commands ?? []).filter(item => item.name).map(item => ({ name: item.name!, description: item.description }))
     }
     const hookNames = [...new Set(paths.flatMap(path => /^hooks\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
@@ -254,7 +261,9 @@ export class AppInstaller {
     const mcpAdded = new Set(previous?.mcpAdded ?? [])
     for (const server of entry.preview.mcpServers) {
       if (!entry.token) continue
-      if (current[server.name] && !mcpAdded.has(server.name)) continue
+      const existing = current[server.name]
+      const placeholder = existing?.disabled && existing.url === `${entry.bridge.replace(/\/$/, '')}/${server.name}` && !Object.keys(existing.headers ?? {}).length
+      if (existing && !mcpAdded.has(server.name) && !placeholder) continue
       if (credentials) {
         current[server.name] = { ...current[server.name], ...credentials[server.name], disabled: false }
         mcpAdded.add(server.name); continue
