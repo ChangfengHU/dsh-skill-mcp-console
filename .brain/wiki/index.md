@@ -1,1 +1,2 @@
 - [app-release-contracts](app-release-contracts.md) — Installed Apps and changing installer declarations
+- [dsh-runtime-source-binding](dsh-runtime-source-binding.md) — Source changes are not loaded-package changes
