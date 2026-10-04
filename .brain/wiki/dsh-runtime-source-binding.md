@@ -21,6 +21,13 @@ independent Fleet publisher-metadata failure rather than claiming readiness.
 Operational snapshots and verification counts live in dev-log/2026-10-04.md.
 
 ## Related
+For App preflight 503, inspect Fleet's upstream status before changing the UI.
+GitHub anonymous API rejection can affect both grant metadata and update checks.
+Use the existing server Vault credential only at api.github.com; never forward it
+to raw content hosts or clients. Public release metadata is not an install grant.
+Verify the actual user tab: check updates, open the App and reach a real permission
+preview. Stop before final install unless that consequential action is authorized.
+
 [[app-release-contracts]] explains publisher installer parsing and update ownership.
 The workspace convention is in .brain/CONVENTIONS.md and ../AGENTS.md.
 
