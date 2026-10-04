@@ -45,5 +45,14 @@ preview. Stop before final install unless that consequential action is authorize
 The workspace convention is in .brain/CONVENTIONS.md and ../AGENTS.md.
 
 ## Date And Expiry
+Local MCP disabled flags are connection opt-outs, not Fleet capability publication
+status. App installation preserves existing disabled configs even without headers,
+skips their network probe and reports a nonblocking yellow warning. Never present
+this as a successful connection or require enabling it to register the App.
+Enabled MCP connection/authentication failures still surface honestly. Acceptance
+must distinguish installed App, available Skills, enabled local MCP connections,
+and actually verified connectivity. Plugin 1.5.8 passed a real installation with
+32 Skills, seven successful MCP probes and one preserved disabled warning.
+
 2026-10-04. Revisit if DSH eliminates profile package copies, changes its loader,
 or the supervised Node runtime changes. Risk: high for deployment verification.

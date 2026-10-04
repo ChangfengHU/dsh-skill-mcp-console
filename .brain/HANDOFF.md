@@ -36,6 +36,12 @@ syncing, unless real crash/HTTP tests justify removing it. Do not use --jitless:
 Node's HTTP parser can need WebAssembly. See wiki/dsh-runtime-source-binding.md.
 
 ## Acceptance Boundary
+Disabled local MCP dependencies do not block App installation. Preserve their
+opt-out and show an explicit untested warning; do not conflate it with Fleet's
+published availability or claim the dependency works locally. Enabled connection
+failures remain genuine failures. The 1.5.8 real installation passed with seven
+MCP probes and a preserved disabled behavior warning.
+
 Read App receipts and app-jobs together with the actual browser report to verify
 install completion; file presence and completed progress stages are insufficient.
 See dev-log and evidence.jsonl for current test and installation acceptance.
