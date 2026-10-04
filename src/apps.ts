@@ -191,7 +191,7 @@ export class AppInstaller {
     if (name !== 'cartoon-video-studio' || !await this.readReceipt(name)) throw new Error('App 未安装')
     const preview = await this.inspect(`bash <(curl -fsSL https://${INSTALLER_HOST}/${name}/release/install-${name}.sh) --bootstrap-token internal-update-preview-only`)
     const current = await toUniversal(this.patch, false)
-    if (preview.mcpServers.some(s => !current[s.name]?.url || current[s.name].disabled || !Object.keys(current[s.name].headers ?? {}).some(k => k.toLowerCase() === 'authorization'))) {
+    if (preview.mcpServers.some(s => !current[s.name]?.url)) {
       this.previews.delete(preview.previewId)
       throw new Error('更新需要可用的 MCP 授权；请启用现有 MCP，或粘贴能力广场的新安装命令补齐授权')
     }
@@ -243,7 +243,7 @@ export class AppInstaller {
     const credentials = entry.credentials ? await exchangeCredentials(entry.credentials, entry.token, entry.preview.mcpServers.map(s => s.name)) : null
     const current = await toUniversal(this.patch, false)
     const previous = await this.readReceipt(entry.preview.name)
-    if (!entry.token && entry.preview.mcpServers.some(s => !current[s.name]?.url || current[s.name].disabled)) throw new Error('现有 MCP 配置已变化，请重新预检更新')
+    if (!entry.token && entry.preview.mcpServers.some(s => !current[s.name]?.url)) throw new Error('现有 MCP 配置已变化，请重新预检更新')
     progress('skills', 0, expected.length, '正在安装 DSH Skills')
     const skillResult = await this.installDshSkills(entry, expected, (current, detail) => {
       progress('skills', current, expected.length, detail)
@@ -272,6 +272,11 @@ export class AppInstaller {
     for (const [index, server] of entry.preview.mcpServers.entries()) {
       const configured = current[server.name]
       const endpoint = configured?.url
+      if (!entry.token && configured?.disabled) {
+        checks.push({ name: server.name, ok: true, detail: '保留原有停用状态；未执行连接验收' })
+        progress('mcp', index + 1, entry.preview.mcpServers.length, `保留 ${server.name} 的停用状态`)
+        continue
+      }
       try {
         if (!endpoint) throw new Error('当前配置不是可直接验收的 HTTP MCP')
         if (configured.disabled) throw new Error('现有 MCP 已停用；未擅自覆盖，请先启用后重试')

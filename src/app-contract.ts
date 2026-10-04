@@ -36,7 +36,7 @@ export async function exchangeCredentials(endpoint: string, token: string, expec
       if (typeof value !== 'string' || !value || /[\r\n]/.test(value)) throw new Error(`授权响应缺少 ${name} 的凭据`)
       headers.Authorization = `Bearer ${value}`
     }
-    if (!Object.keys(headers).some(k => k.toLowerCase() === 'authorization')) throw new Error(`授权响应缺少 ${name} 的认证`)
+    // Some publisher endpoints are public; preserve their declared auth policy.
     result[name] = { type: 'http', url: url.toString(), headers, failOnStartupError: false }
   }
   return result

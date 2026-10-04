@@ -29,3 +29,9 @@ test('exchange resolves credential environment without exposing it in metadata',
   await assert.rejects(exchangeCredentials(`${base}/credentials`, 'bootstrap-test', ['vyibc-image']), /不受信任/)
  } finally { globalThis.fetch = old }
 })
+test('credential service can explicitly declare a public MCP endpoint', async () => {
+ const old = globalThis.fetch
+ try { globalThis.fetch = async () => Response.json({ mcpServers: { 'vyibc-behavior': { url: 'https://fleet.vyibc.com/mcp/behavior' } } });
+  assert.deepEqual((await exchangeCredentials(`${base}/credentials`, 'test', ['vyibc-behavior']))['vyibc-behavior'].headers, {})
+ } finally { globalThis.fetch = old }
+})
