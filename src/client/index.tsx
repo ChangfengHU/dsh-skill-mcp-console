@@ -90,8 +90,11 @@ export async function apply(ctx: any): Promise<void> {
   }
   const appsApi: AppsApi = {
     apps: () => call<AppPreview[]>('apps'),
+    checkAppUpdates: () => call<AppPreview[]>('checkAppUpdates'),
+    previewAppUpdate: name => call<AppPreview>('previewAppUpdate', { name }),
     inspectApp: input => call<AppPreview>('inspectApp', { input }),
-    startAppInstall: previewId => call('startAppInstall', { previewId }),
+    inspectCatalogApp: name => call<AppPreview>('inspectCatalogApp', { name }),
+    startAppInstall: (previewId, overwriteSkills) => call('startAppInstall', { previewId, overwriteSkills }),
     appInstallStatus: jobId => call('appInstallStatus', { jobId }),
     setAppEnabled: async (name_, enabled) => { await call('setAppEnabled', { name: name_, enabled }) },
     uninstallApp: name_ => call('uninstallApp', { name: name_ }),

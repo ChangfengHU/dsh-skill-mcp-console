@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { run } from './install.ts'
 import { fromUniversal, toUniversal } from './mcpconfig.ts'
 import { setSkillState } from './skills.ts'
+import { installerContract, exchangeCredentials } from './app-contract.ts'
+import { requestFleetAppGrant, requestFleetAppRelease, type ReleaseMetadata } from './fleet-app-auth.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -33,6 +35,9 @@ export interface AppPreview {
   updateAvailable: boolean
   managedMcp: string[]
   managedSkills: string[]
+  skillConflicts?: string[]
+  releaseStatus?: 'unchecked' | 'checked' | 'failed'
+  releaseError?: string
   installState: 'available' | 'installed' | 'failed'
   localDevelopment?: boolean
   agentPresets?: string[]
@@ -49,7 +54,7 @@ interface AppReceipt {
 
 interface ParsedImport { slug: string; installer: string; token: string }
 interface StoredPreview {
-  expiresAt: number; token: string; preview: AppPreview; repo: string; marketplace: string; bridge: string; revision: string
+  expiresAt: number; token: string; preview: AppPreview; repo: string; marketplace: string; bridge: string; revision: string; credentials?: string
   skillFiles: { path: string; size: number }[]
 }
 
@@ -82,26 +87,13 @@ async function text(url: string): Promise<string> {
 }
 
 function scriptContract(script: string, slug: string) {
-  const marketplace = /codex\s+plugin\s+marketplace\s+add\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/.exec(script)?.[1]
-  const selector = /codex\s+plugin\s+add\s+([A-Za-z0-9_.-]+)@([A-Za-z0-9_.-]+)/.exec(script)
-  const bridge = /BRIDGE_BASE="\$\{VYIBC_PLUGIN_BRIDGE_BASE:-([^}"\s]+)\}"/.exec(script)?.[1]
-  const list = /servers\s*=\s*\[([^\]]+)\]/.exec(script)?.[1] ?? ''
-  const servers = [...list.matchAll(/['"]([A-Za-z0-9_.-]+)['"]/g)].map(item => item[1])
-  if (!marketplace || !selector || selector[1] !== slug || !bridge || servers.length === 0) {
-    throw new Error('安装器未声明可验证的 Marketplace、App 或 MCP 清单')
-  }
-  if (bridge !== 'https://fleet.vyibc.com/api/hub/plugin-bootstrap/mcp') throw new Error('安装器声明了未受信任的 MCP Bridge')
-  return { repo: marketplace, plugin: selector[1], marketplace: selector[2], bridge, servers }
+  return installerContract(script, slug)
 }
 
 async function githubJson<T>(url: string): Promise<T> {
   return JSON.parse(await text(url)) as T
 }
 
-async function isInstalled(name: string, marketplace: string): Promise<boolean> {
-  const result = await run('codex', ['plugin', 'list'])
-  return result.code === 0 && result.out.split('\n').some(line => line.includes(`${name}@${marketplace}`) && line.includes('installed, enabled'))
-}
 
 function publicPreview(value: Omit<AppPreview, 'previewId' | 'expiresAt'>): AppPreview {
   return { ...value, previewId: randomUUID(), expiresAt: Date.now() + PREVIEW_TTL_MS }
@@ -109,26 +101,36 @@ function publicPreview(value: Omit<AppPreview, 'previewId' | 'expiresAt'>): AppP
 
 export class AppInstaller {
   private previews = new Map<string, StoredPreview>()
+  private installing = new Set<string>()
   private readonly home: string
   private readonly patch: string
+  private release: { revision: string; version: string; skills: string[] } | null = null
+  private releaseError = ''
+  private releaseCheckedAt = 0
 
   constructor(home = homedir(), patch = join(process.env.DSH_HOME ?? join(home, '.dsh'), 'profiles', 'web', 'cordis.patch.yml')) {
     this.home = home
     this.patch = patch
   }
 
-  async inspect(input: string): Promise<AppPreview> {
+  async inspectCatalog(name: string): Promise<AppPreview> {
+    const grant = await requestFleetAppGrant(name, await toUniversal(this.patch, false))
+    return this.inspect(grant.command, grant.metadata)
+  }
+
+  async inspect(input: string, metadata?: ReleaseMetadata): Promise<AppPreview> {
     const parsed = parseAppImport(input)
     const installerText = await text(parsed.installer)
     const contract = scriptContract(installerText, parsed.slug)
-    const head = await githubJson<{ sha?: string }>(`https://api.github.com/repos/${contract.repo}/commits/main`)
+    if (metadata && contract.repo !== 'ChangfengHU/cartoon-video-skills') throw new Error('Fleet 授权与发布仓库不一致')
+    const head = metadata ? { sha: metadata.revision } : await githubJson<{ sha?: string }>(`https://api.github.com/repos/${contract.repo}/commits/main`)
     if (!head.sha || !/^[0-9a-f]{40}$/.test(head.sha)) throw new Error('无法固定 App 发布版本')
     const revision = head.sha
     const rawBase = `https://raw.githubusercontent.com/${contract.repo}/${revision}`
     const manifestPath = `plugins/${contract.plugin}/.codex-plugin/plugin.json`
-    const manifest = await githubJson<any>(`${rawBase}/${manifestPath}`)
+    const manifest = metadata?.manifest ?? await githubJson<any>(`${rawBase}/${manifestPath}`)
     if (manifest.name !== contract.plugin || typeof manifest.version !== 'string') throw new Error('App manifest 与安装器声明不一致')
-    const tree = await githubJson<{ tree?: { path: string; type: string; size?: number }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
+    const tree = metadata ? { tree: metadata.tree } : await githubJson<{ tree?: { path: string; type: string; size?: number }[] }>(`https://api.github.com/repos/${contract.repo}/git/trees/${revision}?recursive=1`)
     const prefix = `plugins/${contract.plugin}/`
     const files = (tree.tree ?? []).filter(item => item.type === 'blob' && item.path.startsWith(prefix))
       .map(item => ({ path: item.path.slice(prefix.length), size: item.size ?? 0 }))
@@ -136,13 +138,19 @@ export class AppInstaller {
     const skillNames = [...new Set(paths.flatMap(path => /^skills\/([^/]+)\/SKILL\.md$/.exec(path)?.[1] ?? []))].sort()
     let commands: AppPart[] = [...new Set(paths.flatMap(path => /^(?:commands|instructions)\/([^/]+)$/.exec(path)?.[1] ?? []))].sort().map(name => ({ name }))
     if (paths.includes('command-support/catalog.json')) {
-      const catalog = await githubJson<{ commands?: { name?: string; description?: string }[] }>(`${rawBase}/plugins/${contract.plugin}/command-support/catalog.json`)
+      const catalog = metadata?.commands ?? await githubJson<{ commands?: { name?: string; description?: string }[] }>(`${rawBase}/plugins/${contract.plugin}/command-support/catalog.json`)
       commands = (catalog.commands ?? []).filter(item => item.name).map(item => ({ name: item.name!, description: item.description }))
     }
     const hookNames = [...new Set(paths.flatMap(path => /^hooks\/([^/]+)$/.exec(path)?.[1] ?? []))].sort()
     const receipt = await this.readReceipt(contract.plugin)
+    const owned = receipt?.managedSkills ?? receipt?.skills ?? []
+    const skillConflicts: string[] = []
+    for (const name of skillNames) {
+      try { await access(join(this.home, '.agents', 'skills', name)); if (!owned.includes(name)) skillConflicts.push(name) } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e }
+    }
     const preview = publicPreview({
       name: manifest.name,
+      skillConflicts,
       displayName: manifest.interface?.displayName || manifest.name,
       version: manifest.version,
       description: manifest.interface?.longDescription || manifest.description || '',
@@ -171,6 +179,32 @@ export class AppInstaller {
   }
 
   /** Public catalog metadata. Installation still requires a fresh signed command. */
+  async checkUpdates(): Promise<AppPreview[]> {
+    try {
+      const repo = 'ChangfengHU/cartoon-video-skills'
+      const head = await githubJson<{ sha: string }>(`https://api.github.com/repos/${repo}/commits/main`)
+      if (!/^[a-f0-9]{40}$/.test(head.sha)) throw new Error('发布版本无效')
+      const manifest = await githubJson<any>(`https://raw.githubusercontent.com/${repo}/${head.sha}/plugins/cartoon-video-studio/.codex-plugin/plugin.json`)
+      if (manifest.name !== 'cartoon-video-studio' || typeof manifest.version !== 'string') throw new Error('发布清单无效')
+      const tree = await githubJson<{ tree: { path: string; type: string }[] }>(`https://api.github.com/repos/${repo}/git/trees/${head.sha}?recursive=1`)
+      this.release = { revision: head.sha, version: manifest.version, skills: tree.tree.filter(x => x.type === 'blob').flatMap(x => /^plugins\/cartoon-video-studio\/skills\/([^/]+)\/SKILL\.md$/.exec(x.path)?.[1] ?? []) }
+      this.releaseError = ''
+    } catch (e) {
+      try {
+        const metadata = await requestFleetAppRelease()
+        this.release = { revision: metadata.revision, version: metadata.manifest.version, skills: metadata.tree.filter(x => x.type === 'blob').flatMap(x => /^plugins\/cartoon-video-studio\/skills\/([^/]+)\/SKILL\.md$/.exec(x.path)?.[1] ?? []) }
+        this.releaseError = ''
+      } catch (fallback) { this.releaseError = `${(e as Error).message}；${(fallback as Error).message}` }
+    }
+    this.releaseCheckedAt = Date.now()
+    return this.catalog()
+  }
+
+  async previewUpdate(name: string): Promise<AppPreview> {
+    if (name !== 'cartoon-video-studio' || !await this.readReceipt(name)) throw new Error('App 未安装')
+    return this.inspectCatalog(name)
+  }
+
   async catalog(): Promise<AppPreview[]> {
     // Catalog navigation must not wait on four publisher/GitHub requests. The
     // signed import preview below remains the authority for the exact release.
@@ -180,13 +214,15 @@ export class AppInstaller {
     const commands = ['studio','studio-xiabanxiaoren','studio-hongyi','studio-ali','studio-new','studio-help','studio-revise','studio-check','studio-publish']
     const result: AppPreview[] = [{
       previewId: '', expiresAt: 0, name: 'cartoon-video-studio', displayName: '卡通视频工作室',
-      version: receipt?.version ?? '0.7.2', installedVersion: receipt?.version ?? null,
+      version: this.release?.version ?? receipt?.version ?? '未知', installedVersion: receipt?.version ?? null,
       description: '从角色、选声到连续表演和成片验收，把完整卡通视频制作能力带进会话。',
       publisher: 'ChangfengHU', source: 'github.com/ChangfengHU/cartoon-video-skills',
-      revision: receipt?.revision ?? 'main', installer: `https://${INSTALLER_HOST}/cartoon-video-studio/release/install-cartoon-video-studio.sh`,
-      skills: (receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
+      revision: this.release?.revision ?? receipt?.revision ?? 'main', installer: `https://${INSTALLER_HOST}/cartoon-video-studio/release/install-cartoon-video-studio.sh`,
+      skills: (this.release?.skills ?? receipt?.skills ?? names).map(name => ({ name })), mcpServers: (receipt?.mcpServers ?? servers).map(name => ({ name })),
       commands: commands.map(name => ({ name })), hooks: [], permissions: ['Read', 'Write'], installed: Boolean(receipt && receipt.status !== 'failed'), enabled: receipt?.enabled !== false,
-      updateAvailable: false,
+      updateAvailable: Boolean(receipt && this.release && receipt.revision !== this.release.revision),
+      releaseStatus: this.releaseError ? 'failed' : this.releaseCheckedAt ? 'checked' : 'unchecked',
+      ...(this.releaseError ? { releaseError: this.releaseError } : {}),
       managedMcp: receipt?.mcpAdded ?? [],
       managedSkills: receipt?.managedSkills ?? receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     }]
@@ -216,26 +252,45 @@ export class AppInstaller {
     return result
   }
 
-  async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
+  async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}, options: { overwriteSkills?: boolean } = {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] }> {
+    const name = this.previews.get(previewId)?.preview.name
+    if (!name) throw new Error('预检已过期，请重新预检')
+    if (this.installing.has(name)) throw new Error('该 App 正在安装或更新，请等待当前任务完成')
+    this.installing.add(name)
+    try { return await this.installExact(previewId, progress, options) } finally { this.installing.delete(name) }
+  }
+
+  private async installExact(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void, options: { overwriteSkills?: boolean }): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
     this.prune()
     const entry = this.previews.get(previewId)
     if (!entry) throw new Error('预检已过期，请重新粘贴安装命令')
     this.previews.delete(previewId)
-    const clean = (value: string) => value.replaceAll(entry.token, '••••')
-    const checks: { name: string; ok: boolean; detail: string }[] = []
+    const clean = (value: string) => entry.token ? value.replaceAll(entry.token, '••••') : value
+    const checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
+    // Reject invalid/expired authorization before changing any local files.
+    const credentials = entry.credentials ? await exchangeCredentials(entry.credentials, entry.token, entry.preview.mcpServers.map(s => s.name)) : null
+    const current = await toUniversal(this.patch, false)
+    const previous = await this.readReceipt(entry.preview.name)
+    if (!entry.token && entry.preview.mcpServers.some(s => !current[s.name]?.url)) throw new Error('现有 MCP 配置已变化，请重新预检更新')
     progress('skills', 0, expected.length, '正在安装 DSH Skills')
     const skillResult = await this.installDshSkills(entry, expected, (current, detail) => {
       progress('skills', current, expected.length, detail)
-    })
+    }, options.overwriteSkills === true)
     progress('skills', expected.length, expected.length, `${skillResult.installed.length} 个安装，${skillResult.reused.length} 个复用`)
     checks.push({ name: 'DSH Skills', ok: true, detail: `${skillResult.installed.length} 个由 App 安装，${skillResult.reused.length} 个环境复用` })
 
-    const current = await toUniversal(this.patch, false)
-    const previous = await this.readReceipt(entry.preview.name)
     const mcpAdded = new Set(previous?.mcpAdded ?? [])
     for (const server of entry.preview.mcpServers) {
-      if (current[server.name]) continue
+      if (!entry.token) continue
+      const existing = current[server.name]
+      if (existing?.disabled) continue
+      const placeholder = existing?.disabled && existing.url === `${entry.bridge.replace(/\/$/, '')}/${server.name}` && !Object.keys(existing.headers ?? {}).length
+      if (existing && !mcpAdded.has(server.name) && !placeholder) continue
+      if (credentials) {
+        current[server.name] = { ...current[server.name], ...credentials[server.name], disabled: false }
+        mcpAdded.add(server.name); continue
+      }
       current[server.name] = {
         type: 'http', url: `${entry.bridge.replace(/\/$/, '')}/${server.name}`,
         headers: { Authorization: `Bearer ${entry.token}` }, failOnStartupError: false,
@@ -249,12 +304,18 @@ export class AppInstaller {
     for (const [index, server] of entry.preview.mcpServers.entries()) {
       const configured = current[server.name]
       const endpoint = configured?.url
+      if (configured?.disabled) {
+        checks.push({ name: server.name, ok: true, warning: true, detail: '本地连接已停用，保留原设置；对应能力暂不可用，不阻断 App 安装。未执行连接验收，不代表 Fleet 服务停用。' })
+        progress('mcp', index + 1, entry.preview.mcpServers.length, `保留 ${server.name} 的停用状态`)
+        continue
+      }
       try {
         if (!endpoint) throw new Error('当前配置不是可直接验收的 HTTP MCP')
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { ...(configured.headers ?? {}), accept: 'application/json, text/event-stream', 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'dsh-app-installer', version: '1' } } }),
+          redirect: 'error', signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         checks.push({ name: server.name, ok: true, detail: 'DSH 连接通过' })
@@ -263,12 +324,7 @@ export class AppInstaller {
       }
       progress('mcp', index + 1, entry.preview.mcpServers.length, `已检查 ${server.name}`)
     }
-    progress('codex', 0, 1, '正在登记 Codex App')
-    const market = await run('codex', ['plugin', 'marketplace', 'add', entry.repo, '--ref', entry.revision, '--json'])
-    const marketOk = market.code === 0 || /already|exists|configured/i.test(market.out)
-    const plugin = marketOk ? await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json']) : { code: -1, out: market.out }
-    const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
-    checks.push({ name: 'Codex Plugin', ok: true, detail: codexOk ? '已安装并启用' : '当前 Codex CLI 不支持 Plugin 子命令；不影响 DSH App 使用' })
+    progress('codex', 0, 1, '正在登记 DSH App')
 
     const failures = checks.filter(check => !check.ok)
     if (failures.length) {
@@ -292,7 +348,7 @@ export class AppInstaller {
     } catch { return null }
   }
 
-  private async installDshSkills(entry: StoredPreview, names: string[], progress: (current: number, detail: string) => void = () => {}): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
+  private async installDshSkills(entry: StoredPreview, names: string[], progress: (current: number, detail: string) => void = () => {}, overwriteSkills = false): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
     const targetRoot = join(process.env.DSH_AGENTS_HOME ?? join(this.home, '.agents'), 'skills')
     const previous = await this.readReceipt(entry.preview.name)
     const owned = previous?.managedSkills ?? previous?.skills ?? []
@@ -302,7 +358,7 @@ export class AppInstaller {
       const target = join(targetRoot, name)
       try {
         await access(target)
-        if (!owned.includes(name)) reused.push(name)
+        if (!owned.includes(name) && !overwriteSkills) reused.push(name)
         else install.push(name)
       } catch (cause) {
         if ((cause as NodeJS.ErrnoException).code === 'ENOENT') install.push(name)
@@ -341,11 +397,24 @@ export class AppInstaller {
         progress(completed, `已准备 ${name}`)
       }
       for (let index = 0; index < install.length; index += 4) await Promise.all(install.slice(index, index + 4).map(installOne))
-      for (const name of install) {
-        const target = join(targetRoot, name)
-        await rm(target, { recursive: true, force: true })
-        await rename(temporary.get(name)!, target)
-        temporary.delete(name)
+      const backup = join(this.home, '.dsh', 'app-backups', entry.preview.name, randomUUID())
+      const replaced: { name: string; saved: boolean; activated: boolean }[] = []
+      await mkdir(backup, { recursive: true, mode: 0o700 })
+      try {
+        for (const name of install) {
+          const item = { name, saved: false, activated: false }; replaced.push(item)
+          const target = join(targetRoot, name)
+          try { await rename(target, join(backup, name)); item.saved = true } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e }
+          await rename(temporary.get(name)!, target); item.activated = true
+          temporary.delete(name)
+        }
+      } catch (e) {
+        for (const item of replaced.reverse()) {
+          const target = join(targetRoot, item.name)
+          if (item.activated) await rm(target, { recursive: true, force: true })
+          if (item.saved) await rename(join(backup, item.name), target)
+        }
+        throw e
       }
       return { installed: install, reused, managed: [...new Set([...owned, ...install])] }
     } finally {
