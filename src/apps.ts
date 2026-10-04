@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { access, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { run } from './install.ts'
@@ -34,6 +34,8 @@ export interface AppPreview {
   managedMcp: string[]
   managedSkills: string[]
   installState: 'available' | 'installed' | 'failed'
+  localDevelopment?: boolean
+  agentPresets?: string[]
 }
 
 interface AppReceipt {
@@ -41,6 +43,8 @@ interface AppReceipt {
   skills: string[]; mcpServers: string[]; mcpAdded?: string[]; installedAt: string; enabled?: boolean
   status?: 'installed' | 'failed'; lastError?: string
   managedSkills?: string[]
+  sourceKind?: string; displayName?: string; description?: string; publisher?: string
+  manifest?: string; manifestSha256?: string; managedAgents?: string[]; permissions?: string[]
 }
 
 interface ParsedImport { slug: string; installer: string; token: string }
@@ -108,7 +112,7 @@ export class AppInstaller {
   private readonly home: string
   private readonly patch: string
 
-  constructor(home = homedir(), patch = join(home, '.dsh', 'profiles', 'web', 'cordis.patch.yml')) {
+  constructor(home = homedir(), patch = join(process.env.DSH_HOME ?? join(home, '.dsh'), 'profiles', 'web', 'cordis.patch.yml')) {
     this.home = home
     this.patch = patch
   }
@@ -174,7 +178,7 @@ export class AppInstaller {
     const names = ['cartoon-hongyi','cartoon-video-studio','cartoon-xiaban','general-video','hyperframes-animation','hyperframes-audio','hyperframes-cli','hyperframes-core','hyperframes-creative','hyperframes-keyframes','hyperframes-registry','hyperframes','media-use','studio-ali','studio-character-workflow','studio-check','studio-director','studio-help','studio-hongyi','studio-materials','studio-music','studio-new','studio-publish','studio-quality','studio-revise','studio-xiabanxiaoren','studio','voice-production','vyibc-character-design']
     const servers = ['vyibc-cartoon-assets','vyibc-image','vyibc-douyin','vyibc-youtube','vyibc-voice','vyibc-behavior','vyibc-xiaohongshu','vyibc-vault']
     const commands = ['studio','studio-xiabanxiaoren','studio-hongyi','studio-ali','studio-new','studio-help','studio-revise','studio-check','studio-publish']
-    return [{
+    const result: AppPreview[] = [{
       previewId: '', expiresAt: 0, name: 'cartoon-video-studio', displayName: '卡通视频工作室',
       version: receipt?.version ?? '0.7.2', installedVersion: receipt?.version ?? null,
       description: '从角色、选声到连续表演和成片验收，把完整卡通视频制作能力带进会话。',
@@ -186,6 +190,30 @@ export class AppInstaller {
       managedMcp: receipt?.mcpAdded ?? [],
       managedSkills: receipt?.managedSkills ?? receipt?.skills ?? [], installState: receipt?.status === 'failed' ? 'failed' : receipt ? 'installed' : 'available',
     }]
+    // Local development Apps are registered only after the native installer has
+    // copied/hash-checked Skills and written presets. Do not present them as
+    // public releases or silently feed local paths to the remote installer.
+    const appRoot = dirname(this.receiptFile('placeholder'))
+    const files = await readdir(appRoot).catch(error => { if (error.code === 'ENOENT') return []; throw error })
+    for (const file of files.sort()) {
+      if (!/^[a-z0-9][a-z0-9-]{0,63}\.json$/.test(file)) continue
+      const app = await this.readReceipt(file.slice(0, -5))
+      if (app?.sourceKind !== 'local-development' || !app.manifest?.endsWith('/dsh/app.json')) continue
+      let verified = false
+      try { verified = createHash('sha256').update(await readFile(app.manifest)).digest('hex') === app.manifestSha256 } catch {}
+      result.push({
+        previewId: '', expiresAt: 0, name: app.name, displayName: app.displayName ?? app.name,
+        version: app.version, installedVersion: app.version, description: app.description ?? '本地开发 App',
+        publisher: app.publisher ?? 'local', source: `本地开发 · ${app.source}`, revision: app.revision,
+        installer: '', skills: app.skills.map(name => ({ name })), mcpServers: app.mcpServers.map(name => ({ name })),
+        commands: [], hooks: [], permissions: app.permissions ?? ['Read', 'Write'],
+        installed: verified && app.status === 'installed', enabled: app.enabled !== false, updateAvailable: false,
+        managedMcp: app.mcpAdded ?? [], managedSkills: app.managedSkills ?? [],
+        installState: verified && app.status === 'installed' ? 'installed' : 'failed',
+        localDevelopment: true, agentPresets: app.managedAgents ?? [],
+      })
+    }
+    return result
   }
 
   async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
@@ -255,7 +283,7 @@ export class AppInstaller {
     return { app: { ...entry.preview, installed, installedVersion: entry.preview.version, enabled: true, updateAvailable: false, managedMcp: [...mcpAdded], managedSkills: skillResult.managed, installState: 'installed' }, checks }
   }
 
-  private receiptFile(name: string) { return join(this.home, '.dsh', 'apps', `${name}.json`) }
+  private receiptFile(name: string) { return join(process.env.DSH_HOME ?? join(this.home, '.dsh'), 'apps', `${name}.json`) }
 
   private async readReceipt(name: string): Promise<AppReceipt | null> {
     try {
@@ -265,7 +293,7 @@ export class AppInstaller {
   }
 
   private async installDshSkills(entry: StoredPreview, names: string[], progress: (current: number, detail: string) => void = () => {}): Promise<{ installed: string[]; reused: string[]; managed: string[] }> {
-    const targetRoot = join(this.home, '.agents', 'skills')
+    const targetRoot = join(process.env.DSH_AGENTS_HOME ?? join(this.home, '.agents'), 'skills')
     const previous = await this.readReceipt(entry.preview.name)
     const owned = previous?.managedSkills ?? previous?.skills ?? []
     const reused: string[] = []
@@ -344,7 +372,7 @@ export class AppInstaller {
     if (!receipt) throw new Error('App 未安装')
     let changed = 0
     for (const skill of receipt.managedSkills ?? receipt.skills) {
-      const dir = join(this.home, '.agents', 'skills', skill)
+      const dir = join(process.env.DSH_AGENTS_HOME ?? join(this.home, '.agents'), 'skills', skill)
       try { await setSkillState(this.home, dir, enabled ? 'on' : 'off'); changed++ } catch {}
     }
     const current = await toUniversal(this.patch, false)
@@ -360,10 +388,10 @@ export class AppInstaller {
     const receipt = await this.readReceipt(name)
     if (!receipt) throw new Error('App 未安装')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const trash = join(this.home, '.dsh', 'app-trash', stamp, name)
+    const trash = join(process.env.DSH_HOME ?? join(this.home, '.dsh'), 'app-trash', stamp, name)
     const moved: string[] = []
     for (const skill of receipt.managedSkills ?? receipt.skills) {
-      const source = join(this.home, '.agents', 'skills', skill)
+      const source = join(process.env.DSH_AGENTS_HOME ?? join(this.home, '.agents'), 'skills', skill)
       try {
         await access(source)
         await mkdir(join(trash, 'skills'), { recursive: true })

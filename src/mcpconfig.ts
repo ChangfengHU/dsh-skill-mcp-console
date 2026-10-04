@@ -258,7 +258,7 @@ export interface ToolPolicy { [server: string]: string[] }
 
 /** Where per-tool opt-outs live. */
 export function policyPath(home: string): string {
-  return join(home, '.dsh', 'skill-mcp-tools.json')
+  return join(process.env.DSH_HOME ?? join(home, '.dsh'), 'skill-mcp-tools.json')
 }
 
 /** Read the per-tool opt-outs, tolerating absence and corruption. */

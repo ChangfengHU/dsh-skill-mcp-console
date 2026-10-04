@@ -17,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   cleanup, createSkill, detect, findSkills, peek, place, runShell, stage, uploadSkill, verify,
@@ -36,7 +36,7 @@ const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
 
 /** Where a skill installed through this panel lands. */
 function defaultRoot(home: string): string {
-  return join(home, '.agents', 'skills')
+  return join(process.env.DSH_AGENTS_HOME ?? join(home, '.agents'), 'skills')
 }
 
 /** The DSH profile this Host was launched with. */
@@ -50,7 +50,7 @@ function profileName(argv: string[] = process.argv): string {
 
 /** The booted profile's directory. */
 function profileDir(home: string, profile = profileName()): string {
-  return join(home, '.dsh', 'profiles', profile)
+  return join(process.env.DSH_HOME ?? join(home, '.dsh'), 'profiles', profile)
 }
 
 /** Where the profile patch layer lives. */
@@ -78,9 +78,9 @@ export class SkillMcpService extends TypertRemoteService {
   private stageSeq = 0
   private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
   private readonly appJobs = new Map<string, { state: 'running' | 'done' | 'failed'; stage: string; current: number; total: number; detail: string; result?: unknown; error?: string }>()
-  private appJobFile(jobId: string): string { return join(homedir(), '.dsh', 'app-jobs', `${jobId}.json`) }
+  private appJobFile(jobId: string): string { return join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'app-jobs', `${jobId}.json`) }
   private async saveAppJob(jobId: string, job: unknown): Promise<void> {
-    const file = this.appJobFile(jobId); await mkdir(join(homedir(), '.dsh', 'app-jobs'), { recursive: true })
+    const file = this.appJobFile(jobId); await mkdir(dirname(file), { recursive: true })
     await writeFile(file, JSON.stringify(job, null, 2) + '\n', { mode: 0o600 })
   }
 

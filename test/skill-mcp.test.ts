@@ -16,10 +16,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { detect, findSkills, isSafeSkillName, verify } from '../src/install.ts'
-import { fromUniversal, phaseOf, toUniversal } from '../src/mcpconfig.ts'
+import { fromUniversal, phaseOf, toUniversal, policyPath } from '../src/mcpconfig.ts'
 import { parseFrontmatter, rootsFor, scanSkills, setSkillState, stateOf } from '../src/skills.ts'
 import { estimateTokens } from '../src/tokens.ts'
 import { parseAppImport } from '../src/apps.ts'
+
+it('uses isolated DSH and Agent roots and policy storage', () => {
+  const oldHome = process.env.DSH_HOME, oldAgents = process.env.DSH_AGENTS_HOME
+  try {
+    process.env.DSH_HOME = '/isolated/dsh'; process.env.DSH_AGENTS_HOME = '/isolated/agents'
+    const roots = rootsFor('/ordinary/home')
+    assert.equal(roots.find(r => r.origin === 'dsh')?.path, '/isolated/dsh/skills')
+    assert.equal(roots.find(r => r.origin === 'agents')?.path, '/isolated/agents/skills')
+    assert.equal(policyPath('/ordinary/home'), '/isolated/dsh/skill-mcp-tools.json')
+  } finally {
+    if (oldHome === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = oldHome
+    if (oldAgents === undefined) delete process.env.DSH_AGENTS_HOME; else process.env.DSH_AGENTS_HOME = oldAgents
+  }
+})
 
 describe('parseAppImport', () => {
   it('accepts the signed App command without returning it to a shell', () => {
@@ -378,6 +392,5 @@ describe('findSkills', () => {
     await rm(root, { recursive: true, force: true })
   })
 })
-
 
 

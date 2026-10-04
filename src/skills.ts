@@ -72,7 +72,10 @@ export function rootsFor(home: string, workspace?: string): { path: string; orig
     list.push({ path, origin, native })
   }
   if (workspace) push(join(workspace, '.agents', 'skills'), 'workspace', true)
-  for (const root of ROOTS) push(join(home, root.rel), root.origin, root.native)
+  for (const root of ROOTS) {
+    const path = root.origin === 'dsh' ? join(process.env.DSH_HOME ?? join(home, '.dsh'), 'skills') : root.origin === 'agents' ? join(process.env.DSH_AGENTS_HOME ?? join(home, '.agents'), 'skills') : join(home, root.rel)
+    push(path, root.origin, root.native)
+  }
   return list
 }
 
@@ -323,7 +326,7 @@ export async function setSkillState(_home: string, dir: string, state: SkillStat
 
 /** Remove one skill directory, moving it to a trash folder rather than deleting. */
 export async function removeSkill(home: string, dir: string): Promise<string> {
-  const trash = join(home, '.dsh', 'skill-trash')
+  const trash = join(process.env.DSH_HOME ?? join(home, '.dsh'), 'skill-trash')
   await mkdir(trash, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const target = join(trash, `${dir.split(sep).pop()}.${stamp}`)

@@ -62,6 +62,8 @@ export interface AppPreview {
   managedMcp: string[]
   managedSkills: string[]
   installState: 'available' | 'installed' | 'failed'
+  localDevelopment?: boolean
+  agentPresets?: string[]
 }
 
 /** The canonical invocation list. Both faces register exactly this. */
