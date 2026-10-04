@@ -6,7 +6,7 @@ import { run } from './install.ts'
 import { fromUniversal, toUniversal } from './mcpconfig.ts'
 import { setSkillState } from './skills.ts'
 import { installerContract, exchangeCredentials } from './app-contract.ts'
-import { requestFleetAppGrant, type ReleaseMetadata } from './fleet-app-auth.ts'
+import { requestFleetAppGrant, requestFleetAppRelease, type ReleaseMetadata } from './fleet-app-auth.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -189,22 +189,20 @@ export class AppInstaller {
       const tree = await githubJson<{ tree: { path: string; type: string }[] }>(`https://api.github.com/repos/${repo}/git/trees/${head.sha}?recursive=1`)
       this.release = { revision: head.sha, version: manifest.version, skills: tree.tree.filter(x => x.type === 'blob').flatMap(x => /^plugins\/cartoon-video-studio\/skills\/([^/]+)\/SKILL\.md$/.exec(x.path)?.[1] ?? []) }
       this.releaseError = ''
-    } catch (e) { this.releaseError = (e as Error).message }
+    } catch (e) {
+      try {
+        const metadata = await requestFleetAppRelease()
+        this.release = { revision: metadata.revision, version: metadata.manifest.version, skills: metadata.tree.filter(x => x.type === 'blob').flatMap(x => /^plugins\/cartoon-video-studio\/skills\/([^/]+)\/SKILL\.md$/.exec(x.path)?.[1] ?? []) }
+        this.releaseError = ''
+      } catch (fallback) { this.releaseError = `${(e as Error).message}；${(fallback as Error).message}` }
+    }
     this.releaseCheckedAt = Date.now()
     return this.catalog()
   }
 
   async previewUpdate(name: string): Promise<AppPreview> {
     if (name !== 'cartoon-video-studio' || !await this.readReceipt(name)) throw new Error('App 未安装')
-    const preview = await this.inspect(`bash <(curl -fsSL https://${INSTALLER_HOST}/${name}/release/install-${name}.sh) --bootstrap-token internal-update-preview-only`)
-    const current = await toUniversal(this.patch, false)
-    if (preview.mcpServers.some(s => !current[s.name]?.url)) {
-      this.previews.delete(preview.previewId)
-      throw new Error('更新需要可用的 MCP 授权；请启用现有 MCP，或粘贴能力广场的新安装命令补齐授权')
-    }
-    const entry = this.previews.get(preview.previewId)!
-    entry.token = ''; entry.credentials = undefined
-    return preview
+    return this.inspectCatalog(name)
   }
 
   async catalog(): Promise<AppPreview[]> {

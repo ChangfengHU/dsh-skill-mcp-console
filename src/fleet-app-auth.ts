@@ -1,6 +1,14 @@
 import type { UniversalServer } from './mcpconfig.ts'
 const BASE = 'https://fleet.vyibc.com/api/hub/plugin-bootstrap'
 export interface ReleaseMetadata { revision: string; manifest: any; tree: { path: string; type: string; size?: number }[]; commands?: { commands?: { name: string; description?: string }[] } }
+export async function requestFleetAppRelease(): Promise<ReleaseMetadata> {
+  const response = await fetch(`${BASE}/release`, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
+  if (!response.ok) throw new Error(`读取 Fleet 发布清单失败（HTTP ${response.status}）`)
+  const data = await response.json() as { ok?: boolean; metadata?: ReleaseMetadata }
+  const metadata = data.metadata
+  if (!data.ok || !metadata || !/^[a-f0-9]{40}$/.test(metadata.revision) || metadata.manifest?.name !== 'cartoon-video-studio' || typeof metadata.manifest.version !== 'string' || !Array.isArray(metadata.tree)) throw new Error('Fleet 发布清单无效')
+  return metadata
+}
 export async function requestFleetAppGrant(name: string, servers: Record<string, UniversalServer>, serviceToken = process.env.DSH_FLEET_APP_SERVICE_TOKEN): Promise<{ command: string; metadata: ReleaseMetadata }> {
   if (name !== 'cartoon-video-studio') throw new Error('此 App 尚未提供 Fleet 安装授权')
   const trusted = Object.values(servers).find(server => !server.disabled && ['https://fleet.vyibc.com/mcp/vault', 'https://fleet.vyibc.com/mcp/fleet'].includes(server.url ?? '') && typeof server.headers?.Authorization === 'string')

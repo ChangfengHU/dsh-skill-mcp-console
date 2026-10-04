@@ -44,3 +44,14 @@ test('catalog checks actual release revision and reports network failures instea
   ;[app] = await installer.checkUpdates(); assert.equal(app.releaseStatus, 'failed'); assert.match(app.releaseError!, /502/)
  } finally { globalThis.fetch = old; await rm(home, { recursive: true, force: true }) }
 })
+
+test('catalog falls back to verified Fleet metadata when anonymous GitHub requests fail', async () => {
+ const home = await mkdtemp(join(tmpdir(), 'dsh-app-fleet-release-')); const old = globalThis.fetch
+ try {
+  globalThis.fetch = async url => String(url) === 'https://fleet.vyibc.com/api/hub/plugin-bootstrap/release'
+   ? Response.json({ ok: true, metadata: { revision: 'b'.repeat(40), manifest: { name: 'cartoon-video-studio', version: 'fixture' }, tree: [{ path: 'plugins/cartoon-video-studio/skills/demo/SKILL.md', type: 'blob' }] } })
+   : new Response('', { status: 403 })
+  const [app] = await new AppInstaller(home).checkUpdates()
+  assert.equal(app.version, 'fixture'); assert.equal(app.releaseStatus, 'checked'); assert.equal(app.skills.length, 1)
+ } finally { globalThis.fetch = old; await rm(home, { recursive: true, force: true }) }
+})
