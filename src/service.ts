@@ -262,8 +262,8 @@ export class SkillMcpService extends TypertRemoteService {
 
   /** Install exactly the package bound to a recent server-side preview. */
   async installApp(payload: string): Promise<string> {
-    const { previewId } = JSON.parse(payload) as { previewId: string }
-    const result = await this.appInstaller.install(previewId)
+    const { previewId, overwriteSkills } = JSON.parse(payload) as { previewId: string; overwriteSkills?: boolean }
+    const result = await this.appInstaller.install(previewId, undefined, { overwriteSkills: overwriteSkills === true })
     this.invalidate()
     // The patch layer and native skill registry are read at boot. Exit only
     // after the response has left; the supervised service comes back with the
@@ -274,12 +274,12 @@ export class SkillMcpService extends TypertRemoteService {
 
   /** Start a long App install without holding one browser RPC open. */
   async startAppInstall(payload: string): Promise<string> {
-    const { previewId } = JSON.parse(payload) as { previewId: string }
+    const { previewId, overwriteSkills } = JSON.parse(payload) as { previewId: string; overwriteSkills?: boolean }
     const jobId = randomUUID()
     const job = { state: 'running' as const, stage: 'starting', current: 0, total: 1, detail: '正在准备安装' }
     this.appJobs.set(jobId, job)
     await this.saveAppJob(jobId, job)
-    void this.appInstaller.install(previewId, (stage, current, total, detail) => { Object.assign(job, { stage, current, total, detail }); void this.saveAppJob(jobId, job) })
+    void this.appInstaller.install(previewId, (stage, current, total, detail) => { Object.assign(job, { stage, current, total, detail }); void this.saveAppJob(jobId, job) }, { overwriteSkills: overwriteSkills === true })
       .then(async result => { const done = { ...job, state: 'done' as const, stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }; this.appJobs.set(jobId, done); await this.saveAppJob(jobId, done); this.invalidate() })
       .catch(async cause => { const failed = { ...job, state: 'failed' as const, error: (cause as Error).message, detail: '安装失败' }; this.appJobs.set(jobId, failed); await this.saveAppJob(jobId, failed) })
     return JSON.stringify({ jobId })
@@ -298,6 +298,12 @@ export class SkillMcpService extends TypertRemoteService {
   /** Available and installed Apps with live release metadata. */
   async apps(): Promise<string> {
     return JSON.stringify(await this.appInstaller.catalog())
+  }
+
+  async checkAppUpdates(): Promise<string> { return JSON.stringify(await this.appInstaller.checkUpdates()) }
+  async previewAppUpdate(payload: string): Promise<string> {
+    const { name } = JSON.parse(payload) as { name: string }
+    return JSON.stringify(await this.appInstaller.previewUpdate(name))
   }
 
   async setAppEnabled(payload: string): Promise<string> {
