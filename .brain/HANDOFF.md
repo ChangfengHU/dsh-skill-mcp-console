@@ -17,5 +17,12 @@ clears its input after preview. `installApp` accepts only that preview id.
 
 Do not weaken this into arbitrary shell execution. New publishers require an
 explicit adapter and allowlisted endpoints. Operational MCP credentials may be
-written only by the supported CLI configuration step; never place them in Git,
-logs, documentation or API responses.
+written only by the supported configuration adapter or publisher credential
+exchange; never place them in Git, logs, documentation or API responses.
+
+Installed Apps use checkAppUpdates and previewAppUpdate; the latter reuses
+existing MCP configuration, while newly missing endpoints need a fresh signed
+command. Skill conflicts outside App ownership require explicit overwrite
+consent. Backups live under ~/.dsh/app-backups. Run the Node test suite and build
+before deploying; the local Mac must use its existing proxy for GitHub while
+localhost and vyibc endpoints remain direct.

@@ -1,0 +1,1 @@
+- [app-release-contracts](app-release-contracts.md) — Installed Apps and changing installer declarations
