@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AppPreview, McpRow, SkillRow } from '../wire.ts'
+import { readAppJobWithRetry } from '../app-poll.ts'
 
 type Check = { name: string; ok: boolean; detail: string }
 export interface AppsApi {
@@ -44,13 +45,39 @@ export function AppsSection({ api }: { api: AppsApi }) {
       const saved = JSON.parse(sessionStorage.getItem(APP_JOB_KEY) || 'null')
       if (saved?.jobId && saved?.preview) {
         setPreview(saved.preview); setDialog(true); setBusy(true)
-        void (async () => { try { for (;;) { const job = await api.appInstallStatus(saved.jobId); setProgress(job); if (job.state === 'failed') throw new Error(job.error || '安装失败'); if (job.state === 'done' && job.result) { setPreview(job.result.app); setChecks(job.result.checks); sessionStorage.removeItem(APP_JOB_KEY); await load(); break } await new Promise(resolve => setTimeout(resolve, 700)) } } catch (e) { setError((e as Error).message); sessionStorage.removeItem(APP_JOB_KEY) } finally { setBusy(false) } })()
+        void watchInstall(saved.jobId)
       }
     } catch { sessionStorage.removeItem(APP_JOB_KEY) }
   }, [])
   const visible = useMemo(() => apps.filter(a => (filter === '全部' || filter === '已安装' && a.installed || filter === '可安装' && !a.installed) && `${a.name} ${a.displayName} ${a.description}`.toLowerCase().includes(query.toLowerCase())), [apps, filter, query])
   const inspect = async () => { setBusy(true); setError(''); try { setPreview(await api.inspectApp(input)); setInput('') } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
-  const install = async () => { if (!preview) return; setBusy(true); setError(''); setProgress({ stage: 'starting', current: 0, total: 1, detail: '正在创建安装任务' }); try { const { jobId } = await api.startAppInstall(preview.previewId, overwriteSkills); sessionStorage.setItem(APP_JOB_KEY, JSON.stringify({ jobId, preview })); for (;;) { await new Promise(resolve => setTimeout(resolve, 700)); const job = await api.appInstallStatus(jobId); setProgress(job); if (job.state === 'failed') throw new Error(job.error || '安装失败'); if (job.state === 'done' && job.result) { setPreview(job.result.app); setChecks(job.result.checks); sessionStorage.removeItem(APP_JOB_KEY); await load(); break } } } catch (e) { setError((e as Error).message); sessionStorage.removeItem(APP_JOB_KEY) } finally { setBusy(false) } }
+  async function watchInstall(jobId: string) {
+    try {
+      for (;;) {
+        const job = await readAppJobWithRetry(() => api.appInstallStatus(jobId))
+        setProgress(job)
+        if (job.state === 'failed') {
+          sessionStorage.removeItem(APP_JOB_KEY)
+          throw new Error(job.error || '安装失败，请重新预检')
+        }
+        if (job.state === 'done' && job.result) {
+          setPreview(job.result.app); setChecks(job.result.checks)
+          sessionStorage.removeItem(APP_JOB_KEY); await load(); break
+        }
+        await new Promise(resolve => setTimeout(resolve, 700))
+      }
+    } catch (e) { setError((e as Error).message) }
+    finally { setBusy(false); setPreview(p => p ? { ...p, previewId: '' } : p) }
+  }
+  const install = async () => {
+    if (!preview?.previewId) return
+    setBusy(true); setError(''); setProgress({ stage: 'starting', current: 0, total: 1, detail: '正在创建安装任务' })
+    try {
+      const { jobId } = await api.startAppInstall(preview.previewId, overwriteSkills)
+      sessionStorage.setItem(APP_JOB_KEY, JSON.stringify({ jobId, preview }))
+      await watchInstall(jobId)
+    } catch (e) { setError((e as Error).message); setBusy(false); setPreview(p => p ? { ...p, previewId: '' } : p) }
+  }
   const close = () => { setDialog(false); setUpdating(false); setOverwriteSkills(false); setPreview(null); setChecks([]); setError('') }
   if (chosen) {
     const skillStates = chosen.skills.map(item => {

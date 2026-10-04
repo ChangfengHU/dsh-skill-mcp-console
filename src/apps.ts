@@ -90,10 +90,6 @@ async function githubJson<T>(url: string): Promise<T> {
   return JSON.parse(await text(url)) as T
 }
 
-async function isInstalled(name: string, marketplace: string): Promise<boolean> {
-  const result = await run('codex', ['plugin', 'list'])
-  return result.code === 0 && result.out.split('\n').some(line => line.includes(`${name}@${marketplace}`) && line.includes('installed, enabled'))
-}
 
 function publicPreview(value: Omit<AppPreview, 'previewId' | 'expiresAt'>): AppPreview {
   return { ...value, previewId: randomUUID(), expiresAt: Date.now() + PREVIEW_TTL_MS }
@@ -300,12 +296,7 @@ export class AppInstaller {
       }
       progress('mcp', index + 1, entry.preview.mcpServers.length, `已检查 ${server.name}`)
     }
-    progress('codex', 0, 1, '正在登记 Codex App')
-    const market = await run('codex', ['plugin', 'marketplace', 'add', entry.repo, '--ref', entry.revision, '--json'])
-    const marketOk = market.code === 0 || /already|exists|configured/i.test(market.out)
-    const plugin = marketOk ? await run('codex', ['plugin', 'add', `${entry.preview.name}@${entry.marketplace}`, '--json']) : { code: -1, out: market.out }
-    const codexOk = plugin.code === 0 || await isInstalled(entry.preview.name, entry.marketplace)
-    checks.push({ name: 'Codex Plugin', ok: true, detail: codexOk ? '已安装并启用' : '当前 Codex CLI 不支持 Plugin 子命令；不影响 DSH App 使用' })
+    progress('codex', 0, 1, '正在登记 DSH App')
 
     const failures = checks.filter(check => !check.ok)
     if (failures.length) {

@@ -30,6 +30,7 @@ import { readSkillFile, removeSkill, scanSkills, setSkillState } from './skills.
 import { estimateToolTokens } from './tokens.ts'
 import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wire.ts'
 import { AppInstaller } from './apps.ts'
+import { AppJobs } from './app-jobs.ts'
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
@@ -77,11 +78,9 @@ export class SkillMcpService extends TypertRemoteService {
   private readonly staged = new Map<string, { dir: string; plan: ReturnType<typeof detect> }>()
   private stageSeq = 0
   private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
-  private readonly appJobs = new Map<string, { state: 'running' | 'done' | 'failed'; stage: string; current: number; total: number; detail: string; result?: unknown; error?: string }>()
-  private appJobFile(jobId: string): string { return join(homedir(), '.dsh', 'app-jobs', `${jobId}.json`) }
+  private readonly appJobs = new AppJobs(join(homedir(), '.dsh', 'app-jobs'))
   private async saveAppJob(jobId: string, job: unknown): Promise<void> {
-    const file = this.appJobFile(jobId); await mkdir(join(homedir(), '.dsh', 'app-jobs'), { recursive: true })
-    await writeFile(file, JSON.stringify(job, null, 2) + '\n', { mode: 0o600 })
+    await this.appJobs.save(jobId, job as Parameters<AppJobs['save']>[1])
   }
 
   /**
@@ -282,21 +281,16 @@ export class SkillMcpService extends TypertRemoteService {
     const { previewId, overwriteSkills } = JSON.parse(payload) as { previewId: string; overwriteSkills?: boolean }
     const jobId = randomUUID()
     const job = { state: 'running' as const, stage: 'starting', current: 0, total: 1, detail: '正在准备安装' }
-    this.appJobs.set(jobId, job)
     await this.saveAppJob(jobId, job)
     void this.appInstaller.install(previewId, (stage, current, total, detail) => { Object.assign(job, { stage, current, total, detail }); void this.saveAppJob(jobId, job) }, { overwriteSkills: overwriteSkills === true })
-      .then(async result => { const done = { ...job, state: 'done' as const, stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }; this.appJobs.set(jobId, done); await this.saveAppJob(jobId, done); this.invalidate() })
-      .catch(async cause => { const failed = { ...job, state: 'failed' as const, error: (cause as Error).message, detail: '安装失败' }; this.appJobs.set(jobId, failed); await this.saveAppJob(jobId, failed) })
+      .then(async result => { const done = { ...job, state: 'done' as const, stage: 'complete', current: 1, total: 1, detail: '安装与验收完成', result }; await this.saveAppJob(jobId, done); this.invalidate() })
+      .catch(async cause => { const failed = { ...job, state: 'failed' as const, error: (cause as Error).message, detail: '安装失败' }; await this.saveAppJob(jobId, failed) })
     return JSON.stringify({ jobId })
   }
 
   async appInstallStatus(payload: string): Promise<string> {
     const { jobId } = JSON.parse(payload) as { jobId: string }
-    if (!/^[0-9a-f-]{36}$/.test(jobId)) throw new Error('安装任务 ID 无效')
-    let job = this.appJobs.get(jobId)
-    if (!job) try { job = JSON.parse(await readFile(this.appJobFile(jobId), 'utf8')) } catch {}
-    if (!job) throw new Error('安装任务不存在或服务已重启')
-    if (job.state !== 'running') setTimeout(() => this.appJobs.delete(jobId), 60_000)
+    const job = await this.appJobs.get(jobId)
     return JSON.stringify(job)
   }
 
