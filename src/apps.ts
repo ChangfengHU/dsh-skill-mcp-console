@@ -224,7 +224,7 @@ export class AppInstaller {
     }]
   }
 
-  async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}, options: { overwriteSkills?: boolean } = {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string }[] }> {
+  async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}, options: { overwriteSkills?: boolean } = {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] }> {
     const name = this.previews.get(previewId)?.preview.name
     if (!name) throw new Error('预检已过期，请重新预检')
     if (this.installing.has(name)) throw new Error('该 App 正在安装或更新，请等待当前任务完成')
@@ -238,7 +238,7 @@ export class AppInstaller {
     if (!entry) throw new Error('预检已过期，请重新粘贴安装命令')
     this.previews.delete(previewId)
     const clean = (value: string) => entry.token ? value.replaceAll(entry.token, '••••') : value
-    const checks: { name: string; ok: boolean; detail: string }[] = []
+    const checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
     // Reject invalid/expired authorization before changing any local files.
     const credentials = entry.credentials ? await exchangeCredentials(entry.credentials, entry.token, entry.preview.mcpServers.map(s => s.name)) : null
@@ -256,6 +256,7 @@ export class AppInstaller {
     for (const server of entry.preview.mcpServers) {
       if (!entry.token) continue
       const existing = current[server.name]
+      if (existing?.disabled) continue
       const placeholder = existing?.disabled && existing.url === `${entry.bridge.replace(/\/$/, '')}/${server.name}` && !Object.keys(existing.headers ?? {}).length
       if (existing && !mcpAdded.has(server.name) && !placeholder) continue
       if (credentials) {
@@ -275,14 +276,13 @@ export class AppInstaller {
     for (const [index, server] of entry.preview.mcpServers.entries()) {
       const configured = current[server.name]
       const endpoint = configured?.url
-      if (!entry.token && configured?.disabled) {
-        checks.push({ name: server.name, ok: true, detail: '保留原有停用状态；未执行连接验收' })
+      if (configured?.disabled) {
+        checks.push({ name: server.name, ok: true, warning: true, detail: '本地连接已停用，保留原设置；对应能力暂不可用，不阻断 App 安装。未执行连接验收，不代表 Fleet 服务停用。' })
         progress('mcp', index + 1, entry.preview.mcpServers.length, `保留 ${server.name} 的停用状态`)
         continue
       }
       try {
         if (!endpoint) throw new Error('当前配置不是可直接验收的 HTTP MCP')
-        if (configured.disabled) throw new Error('现有 MCP 已停用；未擅自覆盖，请先启用后重试')
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { ...(configured.headers ?? {}), accept: 'application/json, text/event-stream', 'content-type': 'application/json' },
