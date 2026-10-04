@@ -21,6 +21,19 @@ independent Fleet publisher-metadata failure rather than claiming readiness.
 Operational snapshots and verification counts live in dev-log/2026-10-04.md.
 
 ## Related
+For installation polling disconnects, compare the job file timestamp with the
+macOS DiagnosticReports crash time and launchd PID/exit status. A persisted running
+record after process death is not a live task. Mark it interrupted on read; never
+infer success from the preceding progress stage. Serialize atomic snapshots and
+retain the browser job id during transient transport failures.
+
+When the crash frames show V8 JIT allocation/Turbofan finalization, test targeted
+--no-opt --no-maglev --no-sparkplug as a Mac-only workaround. Verify real HTTP,
+native SQLite, session preservation and all plugin tests before calling it usable.
+Do not use --jitless blindly: Node Undici may require WebAssembly. Keep the crash
+report; no claim that the underlying Node/protection interaction is conclusively
+diagnosed. Revisit flags after runtime or endpoint protection updates.
+
 For App preflight 503, inspect Fleet's upstream status before changing the UI.
 GitHub anonymous API rejection can affect both grant metadata and update checks.
 Use the existing server Vault credential only at api.github.com; never forward it

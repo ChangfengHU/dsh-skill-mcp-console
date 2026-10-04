@@ -27,7 +27,15 @@ under ~/.dsh/app-backups. Verify source AND actual profile package after updates
 Run tests and build before deploying; Mac native SQLite must match launchd Node.
 Use the existing local proxy for GitHub; localhost and vyibc endpoints stay direct.
 
+DSH installation registers only DSH; it must not silently install Codex plugins.
+Restored running job files represent interrupted work, not success. Re-preflight
+after interruption rather than submitting a consumed preview twice.
+The Mac launch settings are ~/Library/LaunchAgents/com.vyibc.dsh3080.plist.
+Preserve its targeted V8 workaround (--no-opt --no-maglev --no-sparkplug) when
+syncing, unless real crash/HTTP tests justify removing it. Do not use --jitless:
+Node's HTTP parser can need WebAssembly. See wiki/dsh-runtime-source-binding.md.
+
 ## Acceptance Boundary
-Version checks and real local permission preview were verified on 2026-10-04.
-Final content installation and MCP connectivity were not executed or accepted.
-See dev-log/2026-10-04.md and evidence.jsonl for commits and verification.
+Read App receipts and app-jobs together with the actual browser report to verify
+install completion; file presence and completed progress stages are insufficient.
+See dev-log and evidence.jsonl for current test and installation acceptance.
