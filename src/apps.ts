@@ -7,6 +7,7 @@ import { fromUniversal, toUniversal } from './mcpconfig.ts'
 import { setSkillState } from './skills.ts'
 import { installerContract, exchangeCredentials } from './app-contract.ts'
 import { requestFleetAppGrant, requestFleetAppRelease, type ReleaseMetadata } from './fleet-app-auth.ts'
+import { requestPublishedCatalog, type PublishedApp } from './fleet-catalog.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
 const PREVIEW_TTL_MS = 10 * 60_000
@@ -41,6 +42,7 @@ export interface AppPreview {
   installState: 'available' | 'installed' | 'failed'
   localDevelopment?: boolean
   agentPresets?: string[]
+  compatibilityReason?: string
 }
 
 interface AppReceipt {
@@ -107,10 +109,12 @@ export class AppInstaller {
   private release: { revision: string; version: string; skills: string[] } | null = null
   private releaseError = ''
   private releaseCheckedAt = 0
+  private readonly publishedCatalog: () => Promise<PublishedApp[]>
 
-  constructor(home = homedir(), patch = join(process.env.DSH_HOME ?? join(home, '.dsh'), 'profiles', 'web', 'cordis.patch.yml')) {
+  constructor(home = homedir(), patch = join(process.env.DSH_HOME ?? join(home, '.dsh'), 'profiles', 'web', 'cordis.patch.yml'), publishedCatalog: () => Promise<PublishedApp[]> = requestPublishedCatalog) {
     this.home = home
     this.patch = patch
+    this.publishedCatalog = publishedCatalog
   }
 
   async inspectCatalog(name: string): Promise<AppPreview> {
@@ -206,6 +210,7 @@ export class AppInstaller {
   }
 
   async catalog(): Promise<AppPreview[]> {
+    const published = await this.publishedCatalog()
     // Catalog navigation must not wait on four publisher/GitHub requests. The
     // signed import preview below remains the authority for the exact release.
     const receipt = await this.readReceipt('cartoon-video-studio')
@@ -249,7 +254,24 @@ export class AppInstaller {
         localDevelopment: true, agentPresets: app.managedAgents ?? [],
       })
     }
-    return result
+    const local = result.filter(app => app.localDevelopment)
+    const publicApps = await Promise.all(published.map(async app => {
+      if (app.id === 'cartoon-video-studio') return result[0]
+      const receipt = await this.readReceipt(app.id)
+      const parts = (kind: string) => (app.components?.[kind] ?? []).map(part => ({ name: part.id, description: part.description }))
+      return {
+        previewId: '', expiresAt: 0, name: app.id, displayName: app.title,
+        description: app.blurb, publisher: app.repo.split('/')[3], source: app.repo.replace('https://', ''),
+        version: app.source.packageVersion ?? app.version, revision: app.source.revision, installer: '',
+        skills: parts('skills'), mcpServers: parts('mcp'), commands: parts('commands'), hooks: parts('hooks'),
+        permissions: [], installed: receipt?.status === 'installed', installedVersion: receipt?.version ?? null,
+        enabled: receipt?.enabled !== false, updateAvailable: Boolean(receipt && receipt.revision !== app.source.revision),
+        managedSkills: receipt?.managedSkills ?? [], managedMcp: receipt?.mcpAdded ?? [],
+        releaseStatus: 'checked' as const, installState: receipt?.status === 'installed' ? 'installed' as const : 'available' as const,
+        compatibilityReason: '该插件已发布，但其安装格式尚未适配 DSH；不会执行外部 Shell。',
+      }
+    }))
+    return [...publicApps, ...local]
   }
 
   async install(previewId: string, progress: (stage: string, current: number, total: number, detail: string) => void = () => {}, options: { overwriteSkills?: boolean } = {}): Promise<{ app: AppPreview; checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] }> {

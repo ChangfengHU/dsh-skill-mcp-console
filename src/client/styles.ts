@@ -395,6 +395,14 @@ body[data-ds-dark-theme] .dsm-app-card,body[data-ds-dark-theme] .dsm-app-source-
 @media(max-width:720px){.dsm-skill-summary{grid-template-columns:1fr 1fr}}
 @media(max-width:720px){div:has(>nav+div .dsm-root)>nav{display:none}div:has(>nav+div .dsm-root)>div{width:100%;min-width:0}div:has(>div>nav+div .dsm-root){z-index:1000!important}.dsm-app-titlebar .dsm-btn{width:100%}}
 
+.dsm-app-detail .dsm-app-hero{display:grid;grid-template-columns:64px minmax(0,1fr);align-items:start}
+.dsm-app-hero .dsm-grow{min-width:0;overflow-wrap:anywhere}
+.dsm-app-hero .dsm-app-logo{flex-shrink:0}
+.dsm-app-detail .dsm-app-hero .dsm-actions{grid-column:1/-1;width:100%;margin:0;justify-content:flex-start;flex-wrap:wrap}
+.dsm-app-detail .dsm-app-hero h2{font-size:22px;line-height:1.4}
+.dsm-app-catalog .dsm-app-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.dsm-app-catalog,.dsm-app-detail{container-type:inline-size;min-width:0}
+@container(max-width:540px){.dsm-app-overview{grid-template-columns:minmax(0,1fr)}.dsm-app-titlebar,.dsm-app-toolbar{flex-wrap:wrap}.dsm-app-titlebar>div:first-child{flex-basis:100%}.dsm-app-toolbar .dsm-input{width:100%}.dsm-app-prompt{grid-template-columns:1fr}.dsm-detail-tabs{overflow-x:auto}.dsm-app-detail .dsm-app-hero h2{font-size:20px}}
 @media (prefers-reduced-motion: reduce) { .dsm-root *, .dsm-modal * { transition: none !important; } }
 `
 

@@ -4,13 +4,14 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppInstaller } from '../src/apps.ts'
+const published = async () => [{ id: 'cartoon-video-studio', title: 'Studio', blurb: '', repo: 'https://github.com/owner/repo', version: '1', source: { revision: 'a'.repeat(40) }, components: {}, install: '' }]
 
 test('Skill updates preserve unowned files, back up replacements, and stage before touching live files', async () => {
  const home = await mkdtemp(join(tmpdir(), 'dsh-app-update-'))
  const old = globalThis.fetch
  try {
   const dir = join(home, '.agents/skills/demo'); await mkdir(dir, { recursive: true }); await writeFile(join(dir, 'SKILL.md'), 'old')
-  const installer = new AppInstaller(home)
+  const installer = new AppInstaller(home, undefined, published)
   const entry = { preview: { name: 'demo-app' }, repo: 'owner/repo', revision: 'a'.repeat(40), skillFiles: [{ path: 'skills/demo/SKILL.md', size: 3 }] }
   globalThis.fetch = async () => new Response('new')
   let result = await (installer as any).installDshSkills(entry, ['demo'])
@@ -35,7 +36,7 @@ test('catalog checks actual release revision and reports network failures instea
  const home = await mkdtemp(join(tmpdir(), 'dsh-app-release-')); const old = globalThis.fetch
  try {
   await mkdir(join(home, '.dsh/apps'), { recursive: true }); await writeFile(join(home, '.dsh/apps/cartoon-video-studio.json'), JSON.stringify({ name: 'cartoon-video-studio', version: '1', revision: 'a'.repeat(40), skills: [], mcpServers: [] }))
-  const installer = new AppInstaller(home)
+  const installer = new AppInstaller(home, undefined, published)
   assert.equal((await installer.catalog())[0].releaseStatus, 'unchecked')
   globalThis.fetch = async (url) => String(url).includes('/commits/') ? Response.json({ sha: 'b'.repeat(40) }) : String(url).includes('plugin.json') ? Response.json({ name: 'cartoon-video-studio', version: '2' }) : Response.json({ tree: [{ path: 'plugins/cartoon-video-studio/skills/demo/SKILL.md', type: 'blob' }] })
   let [app] = await installer.checkUpdates()
@@ -51,7 +52,7 @@ test('catalog falls back to verified Fleet metadata when anonymous GitHub reques
   globalThis.fetch = async url => String(url) === 'https://fleet.vyibc.com/api/hub/plugin-bootstrap/release'
    ? Response.json({ ok: true, metadata: { revision: 'b'.repeat(40), manifest: { name: 'cartoon-video-studio', version: 'fixture' }, tree: [{ path: 'plugins/cartoon-video-studio/skills/demo/SKILL.md', type: 'blob' }] } })
    : new Response('', { status: 403 })
-  const [app] = await new AppInstaller(home).checkUpdates()
+  const [app] = await new AppInstaller(home, undefined, published).checkUpdates()
   assert.equal(app.version, 'fixture'); assert.equal(app.releaseStatus, 'checked'); assert.equal(app.skills.length, 1)
  } finally { globalThis.fetch = old; await rm(home, { recursive: true, force: true }) }
 })
