@@ -136,7 +136,7 @@ export class AppInstaller {
     if(JSON.stringify(details.skills.slice().sort())!==JSON.stringify(listed)||JSON.stringify(details.mcpIds.slice().sort())!==JSON.stringify((app.components.mcp||[]).map(s=>s.id).sort()))throw Error('包内容与 Fleet 目录不一致');
     const previous=await this.readReceipt(app.id),owned=previous?.managedSkills||[],skillConflicts:string[]=[];
     for(const name of details.skills)try{await access(join(process.env.DSH_AGENTS_HOME??join(this.home,'.agents'),'skills',name));if(!owned.includes(name))skillConflicts.push(name)}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}
-    const preview=publicPreview({name:app.id,displayName:app.title,version:app.version,description:app.blurb,publisher:app.repo.split('/')[3],source:app.repo.replace('https://',''),revision:app.source.revision,installer:app.distribution!.artifact.url,skills:details.skills.map(name=>({name})),mcpServers:details.mcpIds.map(name=>({name})),commands:[],hooks:[],permissions:[],installed:previous?.status==='installed',installedVersion:previous?.version||null,enabled:previous?.enabled!==false,updateAvailable:!!previous&&previous.version!==app.version,managedMcp:previous?.mcpAdded||[],managedSkills:owned,skillConflicts,installState:previous?.status==='failed'?'failed':previous?'installed':'available'});
+    const preview=publicPreview({name:app.id,displayName:app.title,version:app.version,description:app.blurb,publisher:app.repo.split('/')[3],source:app.repo.replace('https://',''),revision:app.source.revision,installer:app.distribution!.artifact.url,skills:details.skills.map(name=>({name})),mcpServers:details.mcpIds.map(name=>({name})),commands:[],hooks:[],permissions:['安装 MCP 授权；标准连接为空授权时补齐，其余独立配置与停用状态保留'],installed:previous?.status==='installed',installedVersion:previous?.version||null,enabled:previous?.enabled!==false,updateAvailable:!!previous&&previous.version!==app.version,managedMcp:previous?.mcpAdded||[],managedSkills:owned,skillConflicts,installState:previous?.status==='failed'?'failed':previous?'installed':'available'});
     const fileContents=Object.fromEntries(Object.entries<string>(value.files).map(([path,text])=>[path,Buffer.from(text,value.binaryPaths.includes(path)?'base64':'utf8')]));
     this.previews.set(preview.previewId,{expiresAt:preview.expiresAt,token:'',preview,repo:app.repo.replace('https://github.com/',''),marketplace:'',bridge:'',revision:app.source.revision,portable:app,fileContents,skillFiles:Object.entries(fileContents).filter(([path])=>path.startsWith('skills/')).map(([path,bytes])=>({path,size:bytes.length}))});
     this.prune();return preview;
@@ -330,7 +330,8 @@ export class AppInstaller {
       if (!entry.token && !grant) continue
       const existing = current[server.name]
       if (existing?.disabled) continue
-      const placeholder = existing?.disabled && existing.url === `${entry.bridge.replace(/\/$/, '')}/${server.name}` && !Object.keys(existing.headers ?? {}).length
+      const declared = entry.fileContents?.['mcp.json'] && JSON.parse(entry.fileContents['mcp.json'].toString()).mcpServers?.[server.name]
+      const placeholder = !!entry.portable && existing?.url === declared?.url && !Object.keys(existing.headers ?? {}).length
       if (existing && !mcpAdded.has(server.name) && !placeholder) continue
       if (credentials) {
         current[server.name] = { ...current[server.name], ...credentials[server.name], disabled: false }
@@ -392,7 +393,8 @@ export class AppInstaller {
     if (failures.length) {
       const detail = failures.map(check => check.name).join('、')
       await this.writeReceipt(entry, [...mcpAdded], 'failed', detail, skillResult.managed)
-      throw new Error(`安装未通过验收：${detail}。已保留阶段状态，可修复后重试。`)
+      const reasons = failures.map(check => `${check.name}: ${check.detail}`).join('；')
+      throw new Error(`安装未通过验收：${reasons}。已保留阶段状态，可修复后重试。`)
     }
     await this.writeReceipt(entry, [...mcpAdded], 'installed', undefined, skillResult.managed)
     const installed = Boolean(await this.readReceipt(entry.preview.name))

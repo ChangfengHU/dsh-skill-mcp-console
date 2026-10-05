@@ -5,6 +5,7 @@ import {mkdtemp,mkdir,readFile,rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {AppInstaller} from '../src/apps.ts'
+import {fromUniversal,toUniversal} from '../src/mcpconfig.ts'
 import {validateFleetPackage,readFleetPackage} from '../src/fleet-plugin-standard.mjs'
 
 const manifest={name:'demo-app',version:'1.0.0',extensions:{'com.vyibc':{schemaVersion:1,entrySkills:['demo-skill'],coreSkills:['demo-skill'],platforms:{dsh:{adapter:'fleet-dsh/v1'}}}}}
@@ -18,6 +19,30 @@ test('portable artifact identity, roles, path and SHA are verified',async()=>{
  assert.throws(()=>validateFleetPackage(value,{name:'other-app'}),/identity/)
  assert.throws(()=>validateFleetPackage({...value,files:{...files,'../outside':'bad'}}),/path/)
  await assert.rejects(readFleetPackage({...artifact,sha256:'0'.repeat(64)},{},async()=>new Response(body)),/integrity/)
+})
+
+for(const headers of [{},{Authorization:'fixture-existing'}])test(`portable install repairs only canonical empty authorization; preserve existing=${!!headers.Authorization}`,async()=>{
+ const home=await mkdtemp(join(tmpdir(),'portable-auth-')),old=globalThis.fetch,token=process.env.DSH_FLEET_APP_SERVICE_TOKEN
+ try{
+  const patch=join(home,'.dsh/profiles/web/cordis.patch.yml');await mkdir(join(home,'.dsh/profiles/web'),{recursive:true})
+  const endpoint='https://fleet.vyibc.com/mcp/behavior',bridge='https://fleet.vyibc.com/api/hub/platforms/demo-app/mcp/demo-service'
+  await fromUniversal(patch,{'demo-service':{type:'http',url:endpoint,headers}})
+  const testValue={...value,files:{...files,'mcp.json':JSON.stringify({mcpServers:{'demo-service':{type:'streamable-http',url:endpoint}}})}}
+  const text=JSON.stringify(testValue),descriptor={...artifact,sha256:createHash('sha256').update(text).digest('hex')},published={...app,components:{skills:app.components.skills,mcp:[{id:'demo-service'}]},distribution:{...app.distribution,artifact:descriptor}}
+  process.env.DSH_FLEET_APP_SERVICE_TOKEN='fixture-service'
+  globalThis.fetch=async(url,options)=>{
+   if(String(url)===artifact.url)return new Response(text)
+   if(String(url).endsWith('/demo-app/dsh'))return Response.json({ok:true,plugin:'demo-app',version:'1.0.0',artifact:descriptor,mcpServers:{'demo-service':{type:'http',url:bridge,headers:{Authorization:'Bearer fixture-scoped'}}}})
+   assert.ok([endpoint,bridge].includes(String(url)))
+   const rpc=JSON.parse(String(options?.body))
+   return rpc.method==='notifications/initialized'?new Response(null,{status:202}):Response.json({jsonrpc:'2.0',id:rpc.id,result:rpc.method==='initialize'?{protocolVersion:'2025-06-18'}:{tools:[]}})
+  }
+  const installer=new AppInstaller(home,patch,async()=>[published]),preview=await installer.inspectCatalog('demo-app')
+  const result=await installer.install(preview.previewId);assert.equal(result.app.installed,true)
+  const final=(await toUniversal(patch,false))['demo-service']
+  assert.equal(final.url,headers.Authorization?endpoint:bridge)
+  assert.equal(final.headers?.Authorization,headers.Authorization||'Bearer fixture-scoped')
+ }finally{globalThis.fetch=old;if(token===undefined)delete process.env.DSH_FLEET_APP_SERVICE_TOKEN;else process.env.DSH_FLEET_APP_SERVICE_TOKEN=token;await rm(home,{recursive:true,force:true})}
 })
 test('generic App installs the verified complete Skill tree without evaluating installers',async()=>{
  const home=await mkdtemp(join(tmpdir(),'portable-app-')),old=globalThis.fetch,token=process.env.DSH_FLEET_APP_SERVICE_TOKEN
