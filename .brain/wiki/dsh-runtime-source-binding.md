@@ -56,3 +56,10 @@ and actually verified connectivity. Plugin 1.5.8 passed a real installation with
 
 2026-10-04. Revisit if DSH eliminates profile package copies, changes its loader,
 or the supervised Node runtime changes. Risk: high for deployment verification.
+
+## Repeated-Request Caveat
+2026-10-05: additional Node/V8 flags did not establish runtime stability.
+Repeated modelConsole snapshots still crashed under Node 22; the original Node
+24 launch configuration and matching SQLite binary were restored. Verify fresh
+crash timestamps and stable PIDs across repeated calls before claiming a fix.
+[[published-apps-and-install-grants]] covers independent Apps catalog acceptance.

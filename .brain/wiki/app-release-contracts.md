@@ -19,3 +19,6 @@ See src/app-contract.ts, src/apps.ts, test/app-contract.test.ts and test/app-upd
 
 ## Expiry
 Recorded 2026-10-04. Revisit when the publisher adopts a structured release manifest, changes credential response schema, or the host gains transactional runtime reload. Risk: medium; declarations are bounded adapters rather than arbitrary script interpretation.
+
+See [[published-apps-and-install-grants]] for the boundary between catalog
+publication and an audited installation adapter.
