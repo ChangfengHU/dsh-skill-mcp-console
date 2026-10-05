@@ -13,4 +13,6 @@
 
 t-1 Fleet published Apps are visible and detail text remains readable inside Settings done
 t-2 Flow and Boss Brain have verified DSH release/grant/install adapters active
+t-2a Flow portable adapter, permission preview and real page install done
+t-2b Boss Brain adapter remains separate; catalog visibility is not installation support active
 t-3 Mac modelConsole snapshot survives repeated calls without process death active

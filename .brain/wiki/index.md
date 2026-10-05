@@ -1,3 +1,4 @@
 - [app-release-contracts](app-release-contracts.md) — Installed Apps and changing installer declarations
 - [dsh-runtime-source-binding](dsh-runtime-source-binding.md) — Source changes are not loaded-package changes
 - [published-apps-and-install-grants](published-apps-and-install-grants.md) - Catalog discovery is not install authorization
+- [portable-plugin-adapters](portable-plugin-adapters.md) - Standard source, platform releases, page confirmation and protocol acceptance

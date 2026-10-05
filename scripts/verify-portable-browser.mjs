@@ -18,16 +18,17 @@ try{
  await call('Page.enable');await call('Runtime.enable');await call('Network.enable');await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
  await call('Page.navigate',{url:'https://dsh.vyibc.com/?installApp=vyibc-flow-video-studio'});
  const wait=async(predicate,count=100)=>{for(let i=0;i<count;i++){if(await evaluate(predicate))return;await new Promise(r=>setTimeout(r,300))}console.log(JSON.stringify({text:await evaluate('document.body.innerText.slice(-1800)'),buttons:await evaluate('Array.from(document.querySelectorAll("button")).map(b=>({text:b.textContent?.trim().slice(0,60),aria:b.getAttribute("aria-label")})).slice(-30)'),errors}));throw Error('UI readiness failed')};
- await wait('!!Array.from(document.querySelectorAll(".dsm-modal button")).find(b=>b.textContent==="确认安装"&&!b.disabled)');
+ await wait('!!Array.from(document.querySelectorAll(".dsm-modal button")).find(b=>["确认安装","备份并更新"].includes(b.textContent)&&!b.disabled)');
  assert.ok(await evaluate('document.querySelector(".dsm-modal").innerText.includes("11 Skills · 9 MCP")'));
  const screenshot=async name=>{const r=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile(path.join(evidence,name),Buffer.from(r.data,'base64'))};
  await screenshot('preview.png');
  if(process.argv.includes('--install')){
-  await evaluate('Array.from(document.querySelectorAll(".dsm-modal button")).find(b=>b.textContent==="确认安装").click()');
+  await evaluate('Array.from(document.querySelectorAll(".dsm-modal button")).find(b=>["确认安装","备份并更新"].includes(b.textContent)).click()');
   await wait('!!document.querySelector(".dsm-app-report")||!!document.querySelector(".dsm-modal .dsm-err")',600);
-  await screenshot('installed.png');
   const error=await evaluate('document.querySelector(".dsm-modal .dsm-err")?.textContent');if(error)throw Error(error);
   assert.ok(await evaluate('document.querySelector(".dsm-app-report").textContent.includes("DSH 已登记")'));
+  await wait('!!Array.from(document.querySelectorAll(".dsm-modal button")).find(b=>b.textContent==="关闭"&&!b.disabled)',200);
+  await screenshot('installed.png');
  }
  console.log(JSON.stringify({ok:true,preview:true,installation:process.argv.includes('--install'),evidence,errors}));
 }finally{ws?.close();chrome.kill('SIGTERM');await new Promise(r=>chrome.once('exit',r));await fs.rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:200})}
