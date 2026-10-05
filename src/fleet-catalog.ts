@@ -3,6 +3,7 @@ export interface PublishedApp {
   source: { revision: string; packageVersion?: string }
   components: Record<string, { id: string; description?: string }[]>
   install: string
+  distribution?: { standard: string; artifact: {url:string;sha256:string}; chatgpt?:{url:string} } | null
 }
 
 export function parsePublishedCatalog(value: unknown): PublishedApp[] {

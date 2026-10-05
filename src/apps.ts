@@ -6,7 +6,8 @@ import { run } from './install.ts'
 import { fromUniversal, toUniversal } from './mcpconfig.ts'
 import { setSkillState } from './skills.ts'
 import { installerContract, exchangeCredentials } from './app-contract.ts'
-import { requestFleetAppGrant, requestFleetAppRelease, type ReleaseMetadata } from './fleet-app-auth.ts'
+import { requestFleetAppGrant, requestFleetAppRelease, requestFleetPortableGrant, type ReleaseMetadata } from './fleet-app-auth.ts'
+import {readFleetPackage,validateFleetPackage} from './fleet-plugin-standard.mjs'
 import { requestPublishedCatalog, type PublishedApp } from './fleet-catalog.ts'
 
 const INSTALLER_HOST = 'skill.vyibc.com'
@@ -58,6 +59,8 @@ interface ParsedImport { slug: string; installer: string; token: string }
 interface StoredPreview {
   expiresAt: number; token: string; preview: AppPreview; repo: string; marketplace: string; bridge: string; revision: string; credentials?: string
   skillFiles: { path: string; size: number }[]
+  fileContents?: Record<string,Buffer>
+  portable?: PublishedApp
 }
 
 function safeUrl(value: string): URL {
@@ -118,8 +121,25 @@ export class AppInstaller {
   }
 
   async inspectCatalog(name: string): Promise<AppPreview> {
+    const p=(await this.publishedCatalog()).find(p=>p.id===name);
+    if(p?.distribution?.standard==='fleet-plugin/v1')return this.inspectPortable(p);
     const grant = await requestFleetAppGrant(name, await toUniversal(this.patch, false))
     return this.inspect(grant.command, grant.metadata)
+  }
+
+  private async inspectPortable(app:PublishedApp):Promise<AppPreview>{
+    const value=await readFleetPackage(app.distribution!.artifact,{name:app.id,version:app.version});
+    const details=validateFleetPackage(value),declaration=details.platforms.dsh;
+    if(declaration?.adapter!=='fleet-dsh/v1')throw Error('该插件未声明 DSH 适配');
+    if(Object.keys(value.files).some(path=>path.startsWith('hooks/')||path.startsWith('commands/'))||value.manifest.hooks||value.manifest.commands)throw Error('DSH v1 尚不支持此包的 Hooks 或 Commands，未执行安装');
+    const listed=(app.components.skills||[]).map(s=>s.id).sort();
+    if(JSON.stringify(details.skills.slice().sort())!==JSON.stringify(listed)||JSON.stringify(details.mcpIds.slice().sort())!==JSON.stringify((app.components.mcp||[]).map(s=>s.id).sort()))throw Error('包内容与 Fleet 目录不一致');
+    const previous=await this.readReceipt(app.id),owned=previous?.managedSkills||[],skillConflicts:string[]=[];
+    for(const name of details.skills)try{await access(join(process.env.DSH_AGENTS_HOME??join(this.home,'.agents'),'skills',name));if(!owned.includes(name))skillConflicts.push(name)}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}
+    const preview=publicPreview({name:app.id,displayName:app.title,version:app.version,description:app.blurb,publisher:app.repo.split('/')[3],source:app.repo.replace('https://',''),revision:app.source.revision,installer:app.distribution!.artifact.url,skills:details.skills.map(name=>({name})),mcpServers:details.mcpIds.map(name=>({name})),commands:[],hooks:[],permissions:[],installed:previous?.status==='installed',installedVersion:previous?.version||null,enabled:previous?.enabled!==false,updateAvailable:!!previous&&previous.version!==app.version,managedMcp:previous?.mcpAdded||[],managedSkills:owned,skillConflicts,installState:previous?.status==='failed'?'failed':previous?'installed':'available'});
+    const fileContents=Object.fromEntries(Object.entries<string>(value.files).map(([path,text])=>[path,Buffer.from(text,value.binaryPaths.includes(path)?'base64':'utf8')]));
+    this.previews.set(preview.previewId,{expiresAt:preview.expiresAt,token:'',preview,repo:app.repo.replace('https://github.com/',''),marketplace:'',bridge:'',revision:app.source.revision,portable:app,fileContents,skillFiles:Object.entries(fileContents).filter(([path])=>path.startsWith('skills/')).map(([path,bytes])=>({path,size:bytes.length}))});
+    this.prune();return preview;
   }
 
   async inspect(input: string, metadata?: ReleaseMetadata): Promise<AppPreview> {
@@ -205,7 +225,8 @@ export class AppInstaller {
   }
 
   async previewUpdate(name: string): Promise<AppPreview> {
-    if (name !== 'cartoon-video-studio' || !await this.readReceipt(name)) throw new Error('App 未安装')
+    if (!/^[a-z][a-z0-9-]{1,63}$/.test(name)) throw new Error('App 名称无效')
+    if (!await this.readReceipt(name)) throw new Error('App 未安装')
     return this.inspectCatalog(name)
   }
 
@@ -268,7 +289,7 @@ export class AppInstaller {
         enabled: receipt?.enabled !== false, updateAvailable: Boolean(receipt && receipt.revision !== app.source.revision),
         managedSkills: receipt?.managedSkills ?? [], managedMcp: receipt?.mcpAdded ?? [],
         releaseStatus: 'checked' as const, installState: receipt?.status === 'installed' ? 'installed' as const : 'available' as const,
-        compatibilityReason: '该插件已发布，但其安装格式尚未适配 DSH；不会执行外部 Shell。',
+        ...(app.distribution?.standard==='fleet-plugin/v1'?{}:{compatibilityReason: '该插件已发布，但其安装格式尚未适配 DSH；不会执行外部 Shell。'}),
       }
     }))
     return [...publicApps, ...local]
@@ -291,10 +312,12 @@ export class AppInstaller {
     const checks: { name: string; ok: boolean; detail: string; warning?: boolean }[] = []
     const expected = entry.preview.skills.map(item => item.name).sort()
     // Reject invalid/expired authorization before changing any local files.
-    const credentials = entry.credentials ? await exchangeCredentials(entry.credentials, entry.token, entry.preview.mcpServers.map(s => s.name)) : null
     const current = await toUniversal(this.patch, false)
+    const grant=entry.portable?await requestFleetPortableGrant(entry.preview.name,current):null;
+    if(grant&&(grant.version!==entry.preview.version||grant.artifact?.sha256!==entry.portable!.distribution!.artifact.sha256||JSON.stringify(Object.keys(grant.mcpServers).sort())!==JSON.stringify(entry.preview.mcpServers.map(s=>s.name).sort())))throw Error('Fleet 发布包或授权范围已变化，请重新预检');
+    const credentials = grant?.mcpServers||(entry.credentials ? await exchangeCredentials(entry.credentials, entry.token, entry.preview.mcpServers.map(s => s.name)) : null)
     const previous = await this.readReceipt(entry.preview.name)
-    if (!entry.token && entry.preview.mcpServers.some(s => !current[s.name]?.url)) throw new Error('现有 MCP 配置已变化，请重新预检更新')
+    if (!entry.token && !grant && entry.preview.mcpServers.some(s => !current[s.name]?.url)) throw new Error('现有 MCP 配置已变化，请重新预检更新')
     progress('skills', 0, expected.length, '正在安装 DSH Skills')
     const skillResult = await this.installDshSkills(entry, expected, (current, detail) => {
       progress('skills', current, expected.length, detail)
@@ -304,7 +327,7 @@ export class AppInstaller {
 
     const mcpAdded = new Set(previous?.mcpAdded ?? [])
     for (const server of entry.preview.mcpServers) {
-      if (!entry.token) continue
+      if (!entry.token && !grant) continue
       const existing = current[server.name]
       if (existing?.disabled) continue
       const placeholder = existing?.disabled && existing.url === `${entry.bridge.replace(/\/$/, '')}/${server.name}` && !Object.keys(existing.headers ?? {}).length
@@ -340,7 +363,24 @@ export class AppInstaller {
           redirect: 'error', signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        checks.push({ name: server.name, ok: true, detail: 'DSH 连接通过' })
+        if (entry.portable) {
+          const parse = (body: string) => {
+            try { return JSON.parse(body) } catch {
+              return body.split('\n').filter(line => line.startsWith('data:')).map(line => { try { return JSON.parse(line.slice(5)) } catch { return null } }).find(item => item?.id)
+            }
+          }
+          const initialized = parse(await response.text())
+          if (!initialized?.result?.protocolVersion || initialized.error) throw Error('MCP 初始化回执无效')
+          const headers = { ...(configured.headers ?? {}), accept: 'application/json, text/event-stream', 'content-type': 'application/json', 'mcp-protocol-version': initialized.result.protocolVersion, ...(response.headers.get('mcp-session-id') ? { 'mcp-session-id': response.headers.get('mcp-session-id')! } : {}) }
+          const notify = await fetch(endpoint, {method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'}),redirect:'error',signal:AbortSignal.timeout(15000)})
+          if (!notify.ok) throw Error(`MCP 初始化确认失败（HTTP ${notify.status}）`)
+          await notify.body?.cancel()
+          const tools = await fetch(endpoint, {method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/list',params:{}}),redirect:'error',signal:AbortSignal.timeout(15000)})
+          if (!tools.ok) throw Error(`MCP 工具读取失败（HTTP ${tools.status}）`)
+          const listed = parse(await tools.text())
+          if (!Array.isArray(listed?.result?.tools) || listed.error) throw Error('MCP 工具回执无效')
+          checks.push({name:server.name,ok:true,detail:`MCP 初始化与 tools/list 通过 · ${listed.result.tools.length} tools`})
+        } else checks.push({ name: server.name, ok: true, detail: 'DSH 连接通过' })
       } catch (cause) {
         checks.push({ name: server.name, ok: false, detail: clean((cause as Error).message) })
       }
@@ -408,9 +448,8 @@ export class AppInstaller {
           const destination = join(temporary.get(match[1])!, relative)
           const encoded = file.path.split('/').map(encodeURIComponent).join('/')
           const url = `https://raw.githubusercontent.com/${entry.repo}/${entry.revision}/plugins/${entry.preview.name}/${encoded}`
-          const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } })
-          if (!response.ok) throw new Error(`下载 ${file.path} 失败（HTTP ${response.status}）`)
-          const data = Buffer.from(await response.arrayBuffer())
+          let data=entry.fileContents?.[file.path]
+          if(!data){const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'dsh-skill-mcp-console' } });if (!response.ok) throw new Error(`下载 ${file.path} 失败（HTTP ${response.status}）`);data=Buffer.from(await response.arrayBuffer())}
           if (data.byteLength !== file.size) throw new Error(`${file.path} 大小与预检不一致`)
           await mkdir(dirname(destination), { recursive: true })
           await writeFile(destination, data)

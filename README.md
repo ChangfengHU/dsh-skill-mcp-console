@@ -2,6 +2,19 @@
 
 ## Apps
 
+Fleet `fleet-plugin/v1` packages are a second supported format. Flow Studio
+uses the same verified source artifact as its ChatGPT release. Apps previews
+validate SHA-256, identity, the complete Skill tree, roles and MCP membership.
+Confirmation obtains plugin-scoped MCP configuration; existing independently
+managed Skills and connections remain unchanged. Portable installs verify
+`initialize` and `tools/list`, not just an HTTP success status. Hooks/Commands
+in a portable v1 package are explicitly rejected rather than silently dropped.
+
+Fleet's `?installApp=<plugin-id>` link opens Apps and the preview only. It never
+executes an installer or confirms installation automatically. The shared
+validator `src/fleet-plugin-standard.mjs` is synchronized from Fleet's
+`fleet-console/src/plugin-standard.mjs`; verify byte equality before release.
+
 The **Apps** settings page installs an aggregate capability package (Skills,
 MCP declarations, instructions and Hooks) from a publisher-provided command.
 The first supported release format is:

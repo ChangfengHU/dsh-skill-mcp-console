@@ -133,6 +133,22 @@ export async function apply(ctx: any): Promise<void> {
     label: 'Skills & MCP',
     inject: () => ({ appsApi, skillsApi, mcpApi, t }),
   }, SkillMcpWorkbenchPage))
+
+  // Fleet links open only the existing Apps preview. No installation, shell
+  // command or composer submission is triggered by a URL.
+  if (new URLSearchParams(window.location.search).get('installApp')) {
+    ctx.effect(() => {
+      let attempts = 0
+      const timer = window.setInterval(() => {
+        if (++attempts > 60 || document.querySelector('.dsm-root')) { window.clearInterval(timer); return }
+        const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+        const app = buttons.find(b => b.textContent?.trim() === 'Apps' && b.closest('[role=dialog]'))
+        if (app) app.click()
+        else buttons.find(b => /^(settings|设置)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim()))?.click()
+      }, 250)
+      return () => window.clearInterval(timer)
+    }, 'skill-mcp: Fleet installation preview')
+  }
 }
 
 /**

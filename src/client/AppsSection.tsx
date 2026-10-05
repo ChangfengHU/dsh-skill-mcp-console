@@ -40,7 +40,15 @@ export function AppsSection({ api }: { api: AppsApi }) {
   const [progress, setProgress] = useState<{ stage: string; current: number; total: number; detail: string } | null>(null)
   const load = async () => { try { const [a, s, m] = await Promise.all([api.apps(), api.skills(), api.mcp()]); setApps(a); setSkills(s); setMcp(m); setChosen(x => x ? a.find(y => y.name === x.name) ?? x : x) } catch (e) { setError((e as Error).message) } }
   useEffect(() => {
-    void load().then(async () => { const next = await api.checkAppUpdates(); setApps(next); setChosen(x => x ? next.find(a => a.name === x.name) ?? x : x) }).catch(e => setError((e as Error).message))
+    void load().then(async () => {
+      const target = new URLSearchParams(window.location.search).get('installApp')
+      if (target) {
+        const next = await api.apps(), app = next.find(a => a.name === target)
+        if (!app || app.compatibilityReason) throw Error(app?.compatibilityReason || '未找到可安装的插件')
+        setChosen(app); await beginInstall(app)
+      }
+      const next = await api.checkAppUpdates(); setApps(next); setChosen(x => x ? next.find(a => a.name === x.name) ?? x : x)
+    }).catch(e => setError((e as Error).message))
     try {
       const saved = JSON.parse(sessionStorage.getItem(APP_JOB_KEY) || 'null')
       if (saved?.jobId && saved?.preview) {

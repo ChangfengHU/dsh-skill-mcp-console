@@ -1,6 +1,19 @@
 import type { UniversalServer } from './mcpconfig.ts'
 const BASE = 'https://fleet.vyibc.com/api/hub/plugin-bootstrap'
 export interface ReleaseMetadata { revision: string; manifest: any; tree: { path: string; type: string; size?: number }[]; commands?: { commands?: { name: string; description?: string }[] } }
+export async function requestFleetPortableGrant(name:string,servers:Record<string,UniversalServer>,serviceToken=process.env.DSH_FLEET_APP_SERVICE_TOKEN){
+ if(!/^[a-z][a-z0-9-]{1,63}$/.test(name))throw Error('无效 App 身份');
+ const trusted=Object.values(servers).find(server=>!server.disabled&&['https://fleet.vyibc.com/mcp/vault','https://fleet.vyibc.com/mcp/fleet'].includes(server.url??'')&&typeof server.headers?.Authorization==='string');
+ const authorization=serviceToken?'Bearer '+serviceToken:trusted?.headers?.Authorization;
+ if(!authorization)throw Error('当前 DSH 尚未连接 Fleet 授权服务');
+ const response=await fetch('https://fleet.vyibc.com/api/hub/platforms/'+name+'/dsh',{method:'POST',redirect:'error',headers:{authorization,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(30000)});
+ if(!response.ok)throw Error('Fleet App 授权失败（HTTP '+response.status+'）');
+ const value=await response.json();if(!value.ok||value.plugin!==name||!value.mcpServers)throw Error('Fleet App 授权响应无效');
+ for(const[id,server]of Object.entries<any>(value.mcpServers)){
+  if(server.url!=='https://fleet.vyibc.com/api/hub/platforms/'+name+'/mcp/'+id||server.type!=='http'||typeof server.headers?.Authorization!=='string'||/[\r\n]/.test(server.headers.Authorization))throw Error('Fleet App 授权端点无效');
+ }
+ return value;
+}
 export async function requestFleetAppRelease(): Promise<ReleaseMetadata> {
   const response = await fetch(`${BASE}/release`, { redirect: 'error', signal: AbortSignal.timeout(30_000) })
   if (!response.ok) throw new Error(`读取 Fleet 发布清单失败（HTTP ${response.status}）`)
