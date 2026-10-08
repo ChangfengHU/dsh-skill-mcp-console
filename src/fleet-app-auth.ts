@@ -1,5 +1,23 @@
 import type { UniversalServer } from './mcpconfig.ts'
 const BASE = 'https://fleet.vyibc.com/api/hub/plugin-bootstrap'
+export async function requestFleetCapabilities(keys: string[], servers: Record<string, UniversalServer>, expectedDigest?: string) {
+  const trusted = Object.values(servers).find(server => !server.disabled && ['https://fleet.vyibc.com/mcp/vault', 'https://fleet.vyibc.com/mcp/fleet'].includes(server.url ?? '') && typeof server.headers?.Authorization === 'string')
+  const authorization = process.env.DSH_FLEET_APP_SERVICE_TOKEN ? 'Bearer ' + process.env.DSH_FLEET_APP_SERVICE_TOKEN : trusted?.headers?.Authorization
+  if (!authorization) throw Error('当前 DSH 尚未连接 Fleet 授权服务，请先配置已有 Fleet 连接')
+  const response = await fetch('https://fleet.vyibc.com/api/hub/platforms/capabilities/dsh', {
+    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(60_000), headers: { authorization, 'content-type': 'application/json' },
+    body: JSON.stringify({ keys, ...(expectedDigest ? { authorize: true, expectedDigest } : {}) }),
+  })
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}))
+    throw Error('Fleet 能力预检失败（HTTP ' + response.status + '）：' + (typeof detail.error === 'string' && /^[a-z0-9_:/-]{1,220}$/i.test(detail.error) ? detail.error : '请检查连接授权和发布源'))
+  }
+  const text = await response.text()
+  if (text.length > 5 * 1024 * 1024) throw Error('Fleet 能力清单超过大小限制')
+  const data = JSON.parse(text)
+  if (!data.ok) throw Error('Fleet 能力清单无效')
+  return data
+}
 export interface ReleaseMetadata { revision: string; manifest: any; tree: { path: string; type: string; size?: number }[]; commands?: { commands?: { name: string; description?: string }[] } }
 export async function requestFleetPortableGrant(name:string,servers:Record<string,UniversalServer>,serviceToken=process.env.DSH_FLEET_APP_SERVICE_TOKEN){
  if(!/^[a-z][a-z0-9-]{1,63}$/.test(name))throw Error('无效 App 身份');

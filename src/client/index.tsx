@@ -94,6 +94,8 @@ export async function apply(ctx: any): Promise<void> {
     previewAppUpdate: name => call<AppPreview>('previewAppUpdate', { name }),
     inspectApp: input => call<AppPreview>('inspectApp', { input }),
     inspectCatalogApp: name => call<AppPreview>('inspectCatalogApp', { name }),
+    inspectCapabilities: keys => call('inspectCapabilities', { keys }),
+    startCapabilityInstall: (previewId, overwriteSkills) => call('startCapabilityInstall', { previewId, overwriteSkills }),
     startAppInstall: (previewId, overwriteSkills) => call('startAppInstall', { previewId, overwriteSkills }),
     appInstallStatus: jobId => call('appInstallStatus', { jobId }),
     setAppEnabled: async (name_, enabled) => { await call('setAppEnabled', { name: name_, enabled }) },
@@ -136,7 +138,7 @@ export async function apply(ctx: any): Promise<void> {
 
   // Fleet links open only the existing Apps preview. No installation, shell
   // command or composer submission is triggered by a URL.
-  if (new URLSearchParams(window.location.search).get('installApp')) {
+  if (['installApp', 'installCapabilities'].some(key => new URLSearchParams(window.location.search).has(key))) {
     ctx.effect(() => {
       let attempts = 0
       const timer = window.setInterval(() => {

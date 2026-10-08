@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AppPreview, McpRow, SkillRow } from '../wire.ts'
 import { readAppJobWithRetry } from '../app-poll.ts'
+import { CapabilityBatchDialog, type BatchApi } from './CapabilityBatchDialog.tsx'
 
 type Check = { name: string; ok: boolean; detail: string; warning?: boolean }
-export interface AppsApi {
+export interface AppsApi extends BatchApi {
   apps: () => Promise<AppPreview[]>; inspectApp: (input: string) => Promise<AppPreview>
   inspectCatalogApp: (name: string) => Promise<AppPreview>
   checkAppUpdates: () => Promise<AppPreview[]>
@@ -109,6 +110,7 @@ export function AppsSection({ api }: { api: AppsApi }) {
       else api.insertPrompt(`使用 ${chosen.displayName} 帮我开始一个项目。`)
     }
     return <section className="dsm-root dsm-app-detail">
+      <CapabilityBatchDialog api={api} onComplete={load} />
       <button className="dsm-link" onClick={() => setChosen(null)}>← 返回 Apps</button>
       <div className="dsm-app-hero"><i className="dsm-app-logo">{appMark(chosen)}</i><div className="dsm-grow">
         <small>{chosen.publisher} · v{chosen.version}{chosen.localDevelopment ? ' · 本地开发版' : ''}</small>
@@ -139,7 +141,7 @@ export function AppsSection({ api }: { api: AppsApi }) {
       {dialog ? <Import {...{ input, setInput, preview, checks, busy, error, progress, inspect, install, close, overwriteSkills, setOverwriteSkills, updating, directInstall }} /> : null}
     </section>
   }
-  return <section className="dsm-root dsm-app-catalog"><div className="dsm-app-titlebar"><div><h2>Apps</h2><p>安装完整能力包：Skills、MCP、指令与 Hooks。</p></div><button className="dsm-btn dsm-primary" onClick={() => { setDirectInstall(false); setDialog(true) }}>＋ 添加 App</button><button className="dsm-btn" disabled={busy} onClick={checkUpdates}>{busy ? "检查中…" : "检查更新"}</button></div><div className="dsm-app-toolbar"><div className="dsm-tabs">{['全部', '已安装', '可安装'].map(x => <button aria-selected={filter === x} onClick={() => setFilter(x)}>{x}</button>)}</div><input className="dsm-input" placeholder="搜索 Apps" value={query} onChange={e => setQuery(e.target.value)} /></div><div className="dsm-app-grid">{visible.map(a => <button className="dsm-app-card" onClick={() => setChosen(a)}><div><i className="dsm-app-logo">{appMark(a)}</i><State app={a} /></div><h3>{a.displayName}</h3><p>{a.description}</p><small>{a.skills.length} Skills · {a.mcpServers.length} MCP · v{a.version}</small></button>)}<article className="dsm-app-source-card"><b>受信任来源</b><p>只解析受支持的发布格式，不执行粘贴的 Shell。</p><button className="dsm-link" onClick={() => { setDirectInstall(false); setDialog(true) }}>导入发布命令 →</button></article></div>{error && !dialog ? <div className="dsm-err">{error}</div> : null}{dialog ? <Import {...{ input, setInput, preview, checks, busy, error, progress, inspect, install, close, overwriteSkills, setOverwriteSkills, updating, directInstall }} /> : null}</section>
+  return <section className="dsm-root dsm-app-catalog"><CapabilityBatchDialog api={api} onComplete={load} /><div className="dsm-app-titlebar"><div><h2>Apps</h2><p>安装完整能力包：Skills、MCP、指令与 Hooks。</p></div><button className="dsm-btn dsm-primary" onClick={() => { setDirectInstall(false); setDialog(true) }}>＋ 添加 App</button><button className="dsm-btn" disabled={busy} onClick={checkUpdates}>{busy ? "检查中…" : "检查更新"}</button></div><div className="dsm-app-toolbar"><div className="dsm-tabs">{['全部', '已安装', '可安装'].map(x => <button aria-selected={filter === x} onClick={() => setFilter(x)}>{x}</button>)}</div><input className="dsm-input" placeholder="搜索 Apps" value={query} onChange={e => setQuery(e.target.value)} /></div><div className="dsm-app-grid">{visible.map(a => <button className="dsm-app-card" onClick={() => setChosen(a)}><div><i className="dsm-app-logo">{appMark(a)}</i><State app={a} /></div><h3>{a.displayName}</h3><p>{a.description}</p><small>{a.skills.length} Skills · {a.mcpServers.length} MCP · v{a.version}</small></button>)}<article className="dsm-app-source-card"><b>受信任来源</b><p>只解析受支持的发布格式，不执行粘贴的 Shell。</p><button className="dsm-link" onClick={() => { setDirectInstall(false); setDialog(true) }}>导入发布命令 →</button></article></div>{error && !dialog ? <div className="dsm-err">{error}</div> : null}{dialog ? <Import {...{ input, setInput, preview, checks, busy, error, progress, inspect, install, close, overwriteSkills, setOverwriteSkills, updating, directInstall }} /> : null}</section>
 }
 function appMark(app: AppPreview) { return app.name === 'cartoon-video-studio' ? 'CV' : app.name === 'boss-brain' ? 'BB' : app.name === 'vyibc-flow-video-studio' ? 'FV' : app.displayName.slice(0, 2) }
 function State({ app }: { app: AppPreview }) { return <span className={`dsm-chip ${app.installed && app.enabled ? 'dsm-ok' : app.installState === 'failed' ? 'dsm-bad' : ''}`}>{app.compatibilityReason && !app.installed ? '尚未适配' : app.installState === 'failed' ? '安装未通过' : !app.installed ? '可安装' : app.updateAvailable ? '有更新' : app.enabled ? '已启用' : '已停用'}</span> }

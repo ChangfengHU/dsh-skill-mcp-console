@@ -31,6 +31,7 @@ import { estimateToolTokens } from './tokens.ts'
 import type { DirectoryEntry, McpRow, McpTool, SkillRow, SkillState } from './wire.ts'
 import { AppInstaller } from './apps.ts'
 import { AppJobs } from './app-jobs.ts'
+import { CapabilityBatchInstaller } from './capability-batch.ts'
 
 /** `mcp__<server>__<tool>` — how the official client namespaces what it registers. */
 const TOOL_PREFIX = /^mcp__(.+?)__(.+)$/
@@ -78,9 +79,31 @@ export class SkillMcpService extends TypertRemoteService {
   private readonly staged = new Map<string, { dir: string; plan: ReturnType<typeof detect> }>()
   private stageSeq = 0
   private readonly appInstaller = new AppInstaller(homedir(), patchFile(homedir()))
+  private readonly capabilityInstaller = new CapabilityBatchInstaller(homedir(), patchFile(homedir()), this.appInstaller)
   private readonly appJobs = new AppJobs(join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'app-jobs'))
   private async saveAppJob(jobId: string, job: unknown): Promise<void> {
     await this.appJobs.save(jobId, job as Parameters<AppJobs['save']>[1])
+  }
+
+  async inspectCapabilities(payload: string): Promise<string> {
+    return JSON.stringify(await this.capabilityInstaller.inspect(JSON.parse(payload).keys))
+  }
+
+  async startCapabilityInstall(payload: string): Promise<string> {
+    const input = JSON.parse(payload), jobId = randomUUID()
+    if (typeof input.previewId !== 'string') throw Error('批量安装预检 ID 无效')
+    await this.saveAppJob(jobId, { state: 'running', stage: 'starting', current: 0, total: 1, detail: '正在安装所选能力' })
+    void this.capabilityInstaller.install(input.previewId, input.overwriteSkills === true, (stage, current, total, detail) => {
+      void this.saveAppJob(jobId, { state: 'running', stage, current, total, detail })
+    }).then(async result => {
+      this.invalidate()
+      await this.saveAppJob(jobId, { state: 'done', stage: 'complete', current: 1, total: 1, detail: result.status === 'installed' ? '批量安装完成' : '部分完成，请查看逐项结果', result })
+    }, async cause => {
+      const message = cause instanceof Error ? cause.message : ''
+      const safe = /^(Fleet |预检已过期|已有批量安装)/.test(message) && /^[\u4e00-\u9fffA-Za-z0-9 _（）：；，。、:/-]{1,240}$/.test(message) ? message : '请重新预检检查授权、版本或文件校验'
+      await this.saveAppJob(jobId, { state: 'failed', stage: 'failed', current: 0, total: 1, detail: '批量安装未完成', error: '批量安装未完成：' + safe + '。已落地能力和配置保留。' })
+    })
+    return JSON.stringify({ jobId })
   }
 
   /**

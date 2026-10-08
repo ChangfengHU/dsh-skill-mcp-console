@@ -50,6 +50,7 @@ export const METHODS = [
   ['detectInstall', 1], ['peekInstall', 1], ['stageInstall', 1], ['runInstall', 1],
   ['createSkill', 1], ['uploadSkill', 1], ['directory', 1], ['repoReadme', 1],
   ['inspectApp', 1], ['inspectCatalogApp', 1], ['installApp', 1], ['startAppInstall', 1], ['appInstallStatus', 1], ['apps', 0], ['checkAppUpdates', 0], ['previewAppUpdate', 1], ['setAppEnabled', 1], ['uninstallApp', 1],
+  ['inspectCapabilities', 1], ['startCapabilityInstall', 1],
 ] as const
 
 export interface AppPart { name: string; description?: string }
@@ -67,6 +68,7 @@ export interface AppPreview {
   installState: 'available' | 'installed' | 'failed'
   localDevelopment?: boolean
   agentPresets?: string[]
+  compatibilityReason?: string
 }
 
 /** The canonical invocation list. Both faces register exactly this. */

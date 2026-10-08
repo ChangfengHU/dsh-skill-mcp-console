@@ -1,6 +1,25 @@
 # dsh-skill-mcp-console
 
-## Apps
+## Batch installation from Fleet's Skill / MCP library
+
+Select capabilities in Fleet and choose **批量安装到 DSH**. The link carries
+only capability IDs (`?installCapabilities=<JSON array>`), not executable
+commands or credentials. DSH reads the authorized plan on the host, previews
+the complete Skill trees and required MCP dependencies, and waits for explicit
+confirmation. Package-only capabilities keep their owning App intact.
+
+Existing Skills, independent MCP configuration and disabled connections are
+preserved by default. Explicit Skill replacement first makes a recoverable
+backup. Source digests and every file hash are checked; MCP acceptance uses
+`initialize` and `tools/list`. Personal OAuth still requires the owner's
+authorization. A failed connection is reported as partial completion, never
+as a successful live connection. A private, credential-free receipt lives
+under `~/.dsh/capability-installs/`; interrupted jobs can be reopened after
+refresh. Configuration installation does not run an Agent or generate media.
+The native runtime may require a reload to discover new MCP configuration;
+the installer does not interrupt other running sessions automatically.
+
+## App package installation
 
 Fleet `fleet-plugin/v1` packages are a second supported format. Flow Studio
 uses the same verified source artifact as its ChatGPT release. Apps previews
