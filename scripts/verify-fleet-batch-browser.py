@@ -30,6 +30,26 @@ with sync_playwright() as p:
         route.continue_()
     page.route('**/api/**', guard)
     start = time.monotonic()
+    fleet_checked = False
+    if os.environ.get('DSH_BATCH_VIA_FLEET') == '1':
+        page.goto('https://fleet.vyibc.com/#/hub', wait_until='domcontentloaded', timeout=45000)
+        frame = page.frame_locator('#hubWorkspaceFrame')
+        expect(frame.locator('#tabCapabilities')).to_be_visible(timeout=60000)
+        expect(frame.locator('#syncStatus')).to_contain_text('实时目录', timeout=60000)
+        frame.locator('#tabCapabilities').click()
+        for key in keys:
+            frame.locator('#search').fill(key.split(':', 1)[1])
+            box = frame.locator('[data-select-capability="'+key+'"]')
+            expect(box).to_be_enabled(timeout=15000)
+            box.check()
+        frame.locator('#selectionDsh').click()
+        expect(frame.locator('#clientTarget')).to_have_value('dsh')
+        link = frame.locator('#openDshBatch')
+        expect(link).to_be_visible()
+        from urllib.parse import urlparse, parse_qs
+        actual = json.loads(parse_qs(urlparse(link.get_attribute('href')).query)['installCapabilities'][0])
+        assert set(actual) == set(keys), 'handoff must match exactly the selected independent capabilities'
+        fleet_checked = True
     page.goto('https://dsh.vyibc.com/?'+urlencode({'session': sid, 'installCapabilities': json.dumps(keys, separators=(',', ':'))}), wait_until='domcontentloaded', timeout=45000)
     dialog = page.get_by_role('dialog', name='批量安装到 DSH')
     expect(dialog).to_be_visible(timeout=60000)
@@ -47,5 +67,5 @@ with sync_playwright() as p:
         assert installs == ['skillMcp/startCapabilityInstall'], 'unexpected duplicate installation'
     assert not errors, {'pageErrorCount': len(errors)}
     assert all(method == 'session.create' for method in blocked), {'unexpectedMutationCount': len(blocked)}
-    print(json.dumps({'appsVisible': True, 'batchPreviewVisible': True, 'confirmationCount': len(installs), 'pageErrors': len(errors), 'blockedBlankSessionCreates': len(blocked), 'elapsedSeconds': round(time.monotonic()-start, 2), 'widths': [1440, 390]}))
+    print(json.dumps({'fleetLibraryVerified': fleet_checked, 'appsVisible': True, 'batchPreviewVisible': True, 'confirmationCount': len(installs), 'pageErrors': len(errors), 'blockedBlankSessionCreates': len(blocked), 'elapsedSeconds': round(time.monotonic()-start, 2), 'widths': [1440, 390]}))
     browser.close()
