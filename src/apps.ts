@@ -122,6 +122,7 @@ export class AppInstaller {
 
   async inspectCatalog(name: string): Promise<AppPreview> {
     const p=(await this.publishedCatalog()).find(p=>p.id===name);
+    if(p?.compatibilityReason)throw Error(p.compatibilityReason);
     if(p?.distribution?.standard==='fleet-plugin/v1')return this.inspectPortable(p);
     const grant = await requestFleetAppGrant(name, await toUniversal(this.patch, false))
     return this.inspect(grant.command, grant.metadata)
@@ -282,14 +283,14 @@ export class AppInstaller {
       const parts = (kind: string) => (app.components?.[kind] ?? []).map(part => ({ name: part.id, description: part.description }))
       return {
         previewId: '', expiresAt: 0, name: app.id, displayName: app.title,
-        description: app.blurb, publisher: app.repo.split('/')[3], source: app.repo.replace('https://', ''),
+        description: app.blurb, publisher: app.repo.split('/')[3] || 'Fleet', source: app.repo.replace('https://', ''),
         version: app.source.packageVersion ?? app.version, revision: app.source.revision, installer: '',
         skills: parts('skills'), mcpServers: parts('mcp'), commands: parts('commands'), hooks: parts('hooks'),
         permissions: [], installed: receipt?.status === 'installed', installedVersion: receipt?.version ?? null,
         enabled: receipt?.enabled !== false, updateAvailable: Boolean(receipt && receipt.revision !== app.source.revision),
         managedSkills: receipt?.managedSkills ?? [], managedMcp: receipt?.mcpAdded ?? [],
         releaseStatus: 'checked' as const, installState: receipt?.status === 'installed' ? 'installed' as const : 'available' as const,
-        ...(app.distribution?.standard==='fleet-plugin/v1'?{}:{compatibilityReason: '该插件已发布，但其安装格式尚未适配 DSH；不会执行外部 Shell。'}),
+        ...(app.compatibilityReason ? { compatibilityReason: app.compatibilityReason } : app.distribution?.standard==='fleet-plugin/v1'?{}:{compatibilityReason: '该插件已发布，但其安装格式尚未适配 DSH；不会执行外部 Shell。'}),
       }
     }))
     return [...publicApps, ...local]

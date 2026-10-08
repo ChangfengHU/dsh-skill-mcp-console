@@ -3,6 +3,7 @@ export interface PublishedApp {
   source: { revision: string; packageVersion?: string }
   components: Record<string, { id: string; description?: string }[]>
   install: string
+  compatibilityReason?: string
   distribution?: { standard: string; artifact: {url:string;sha256:string}; chatgpt?:{url:string} } | null
 }
 
@@ -13,16 +14,22 @@ export function parsePublishedCatalog(value: unknown): PublishedApp[] {
   for (const app of data.plugins) {
     if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(app.id) || ids.has(app.id)
       || typeof app.title !== 'string' || typeof app.blurb !== 'string'
-      || typeof app.repo !== 'string' || !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(app.repo)
-      || !/^[a-f0-9]{40}$/.test(app.source?.revision ?? '')
-      || typeof app.version !== 'string' || typeof app.install !== 'string'
+      || app.repo !== undefined && (typeof app.repo !== 'string' || !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(app.repo))
+      || app.source?.revision !== undefined && !/^[a-f0-9]{40}$/.test(app.source.revision)
+      || typeof app.version !== 'string' || app.install !== undefined && typeof app.install !== 'string'
       || !app.components || typeof app.components !== 'object'
       || Object.values(app.components).some(parts => !Array.isArray(parts) || parts.some(part => typeof part?.id !== 'string'))) {
       throw new Error('Fleet 插件目录包含无效或重复的发布项')
     }
     ids.add(app.id)
   }
-  return data.plugins
+  // Fleet also lists Harness-only/local publications. They are valid catalog
+  // entries, but are not an immutable DSH install source. Keep them visible
+  // without letting one such entry break every installed App.
+  return data.plugins.map(app => ({
+    ...app, repo: app.repo ?? '', source: { ...app.source, revision: app.source?.revision ?? '' }, install: app.install ?? '',
+    ...(!app.repo || !app.source?.revision ? { compatibilityReason: '此发布项尚未提供 DSH 可核验的安装来源；其他 Apps 不受影响。' } : {}),
+  }))
 }
 
 export async function requestPublishedCatalog(): Promise<PublishedApp[]> {

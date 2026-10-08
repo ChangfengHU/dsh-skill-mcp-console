@@ -38,7 +38,14 @@ export function AppsSection({ api }: { api: AppsApi }) {
     try { setPreview(await api.previewAppUpdate(app.name)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   const [progress, setProgress] = useState<{ stage: string; current: number; total: number; detail: string } | null>(null)
-  const load = async () => { try { const [a, s, m] = await Promise.all([api.apps(), api.skills(), api.mcp()]); setApps(a); setSkills(s); setMcp(m); setChosen(x => x ? a.find(y => y.name === x.name) ?? x : x) } catch (e) { setError((e as Error).message) } }
+  const load = async () => {
+    const results = await Promise.allSettled([api.apps(), api.skills(), api.mcp()])
+    const [a, s, m] = results
+    if (a.status === 'fulfilled') { setApps(a.value); setChosen(x => x ? a.value.find(y => y.name === x.name) ?? x : x) }
+    if (s.status === 'fulfilled') setSkills(s.value)
+    if (m.status === 'fulfilled') setMcp(m.value)
+    setError(results.filter(r => r.status === 'rejected').map(r => r.reason.message).join('；'))
+  }
   useEffect(() => {
     void load().then(async () => {
       const target = new URLSearchParams(window.location.search).get('installApp')
@@ -123,7 +130,7 @@ export function AppsSection({ api }: { api: AppsApi }) {
         </div>
         <p>真实状态：{skillReady}/{chosen.skills.length} Skills 可用，{mcp.filter(m => chosen.mcpServers.some(x => x.name === m.name) && !m.disabled).length}/{chosen.mcpServers.length} MCP 已配置。</p>
         {chosen.agentPresets?.map(id => <p key={id}>绑定 Agent：<code>{id}</code></p>)}
-      </main><aside><b>来源</b>{chosen.localDevelopment ? <span>{chosen.source}</span> : <a href={`https://${chosen.source}/tree/${chosen.revision}`} target="_blank" rel="noreferrer">{chosen.source}</a>}
+      </main><aside><b>来源</b>{chosen.localDevelopment || !chosen.source ? <span>{chosen.source || 'Fleet 目录 · 安装来源待补齐'}</span> : <a href={`https://${chosen.source}/tree/${chosen.revision}`} target="_blank" rel="noreferrer">{chosen.source}</a>}
         <small>固定版本 {chosen.revision.slice(0, 12)}</small><b>权限</b><span>{chosen.permissions.join('、') || '未声明额外权限'}</span>
       </aside></div> : tab === 'Skills' ? <div className="dsm-app-list">
         <div className="dsm-skill-summary"><div><b>{skillReady}/{chosen.skills.length}</b><span>Skills 可用</span></div><div><b>{skillStates.filter(x => x.owner === 'managed').length}</b><span>App 管理</span></div><div><b>{skillStates.filter(x => x.owner === 'reused').length}</b><span>环境复用</span></div><div><b>{skillStates.filter(x => x.owner === 'missing').length}</b><span>未安装</span></div></div>
