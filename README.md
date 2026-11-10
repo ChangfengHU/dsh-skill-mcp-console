@@ -178,6 +178,8 @@ dsh plugin --profile web add ./dsh-skill-mcp-console-1.0.0.tgz
 
 ## Licence
 
+## 授权
+
 MIT
 
 ---
@@ -267,6 +269,10 @@ frontmatter 之前都会先备份到 `<技能>/.dsm-backup/`。
 **故意不内置"我们自己的"技能索引。** 把一个部署的内部工具枚举在公网地址上,
 等于把"公开但不可枚举"变成"这是清单";何况那些本来就已经装好了 ——
 Browse 是用来找你没有的东西的。
+
+## Browser Performance
+
+The browser bundle uses public Zod Mini string codecs, minification and a 140 KB build budget. This reduces startup transfer and parsing without changing RPC validation, MCP grants, credentials or skill policies. See [performance notes](docs/performance-1.6.4.md).
 
 ## 授权
 

@@ -6,13 +6,13 @@
  * Every method is string-in / string-out carrying JSON. Typert's only codec
  * mode is `strict` and its loader accepts zod v4 schemas only, so each
  * descriptor needs a real one; keeping the payloads as JSON strings makes
- * that one `z.string()` per side instead of a schema per shape, on a surface
+ * that one `string()` per side instead of a schema per shape, on a surface
  * that is still moving.
  *
  * @module dsh-skill-mcp/wire
  */
 
-import { z } from 'zod'
+import { string } from 'zod/mini'
 
 /** Package id, repeated in every descriptor id and in both Typert faces. */
 export const PKG = 'dsh-skill-mcp-console'
@@ -23,12 +23,12 @@ function jsonParam(name: string) {
     name,
     wire: name,
     source: 'json',
-    codec: Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Json`, schema: z.string() }),
+    codec: Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Json`, schema: string() }),
   })
 }
 
 /** One JSON-string result. */
-const JSON_RESULT = Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Json`, schema: z.string() })
+const JSON_RESULT = Object.freeze({ mode: 'strict', typeSymbol: `${PKG}/types#Json`, schema: string() })
 
 function descriptor(method: string, argc: 0 | 1) {
   return Object.freeze({

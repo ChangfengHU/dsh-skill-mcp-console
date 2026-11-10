@@ -46,12 +46,16 @@ const client = await build({
   format: 'cjs',
   platform: 'browser',
   target: 'es2022',
+  minify: true,
   jsx: 'automatic',
   external: ['react', 'react-dom', 'react/jsx-runtime'],
   logLevel: 'info',
 })
 
 const body = client.outputFiles[0].text
+const bytes = Buffer.byteLength(body)
+if (bytes > 140_000) throw new Error(`Client bundle exceeds its 140 KB budget: ${bytes} bytes`)
+console.log(`Client bundle: ${bytes} bytes`)
 await writeFile(join(out, 'client.js'), `window.__ModuleLoader__.load({
 \tid: ${JSON.stringify(pkg.name)},
 \tfactory: (require) => {
